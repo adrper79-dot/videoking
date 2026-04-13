@@ -30,3 +30,25 @@ export async function deleteFromR2(env: Env, key: string): Promise<void> {
 export function r2ObjectUrl(key: string): string {
   return `https://assets.nichestream.tv/${key}`;
 }
+
+/**
+ * Factory function for per-request R2 client (convenience wrapper).
+ * Returns an object with putObject, getObjectUrl, and deleteObject methods.
+ */
+export function createR2(env: Env) {
+  return {
+    async putObject(
+      path: string,
+      data: ArrayBuffer,
+      options?: { httpMetadata?: { contentType?: string } }
+    ) {
+      await env.R2_BUCKET.put(path, data, options || {});
+    },
+    getObjectUrl(path: string) {
+      return r2ObjectUrl(path);
+    },
+    async deleteObject(path: string) {
+      await deleteFromR2(env, path);
+    },
+  };
+}

@@ -9,6 +9,9 @@ import { playlistRoutes } from "./routes/playlists";
 import { stripeRoutes } from "./routes/stripe";
 import { webhookRoutes } from "./routes/webhooks";
 import { moderationRoutes } from "./routes/moderation";
+import adminRouter from "./routes/admin";
+import eventsRouter from "./routes/events";
+import assetsRouter from "./routes/assets";
 import { VideoRoom } from "./durable-objects/VideoRoom";
 import { UserPresence } from "./durable-objects/UserPresence";
 import { createDb } from "./lib/db";
@@ -86,7 +89,17 @@ app.route("/api/webhooks", webhookRoutes);
 // ─── Moderation Routes ────────────────────────────────────────────────────────
 
 app.route("/api/moderation", moderationRoutes);
+// ─── Admin Routes ─────────────────────────────────────────────────────────────
 
+app.route("/api/admin", adminRouter);
+
+// ─── Events Routes ────────────────────────────────────────────────────────────
+
+app.route("/api/events", eventsRouter);
+
+// ─── Assets Routes ────────────────────────────────────────────────────────────
+
+app.route("/api/assets", assetsRouter);
 // ─── WebSocket: upgrade to VideoRoom Durable Object ──────────────────────────
 
 /**
