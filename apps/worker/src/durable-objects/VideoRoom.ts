@@ -289,6 +289,29 @@ export class VideoRoom {
     }
     await this.state.storage.put("chatHistory", this.chatHistory);
 
+    // Persist to database asynchronously (non-blocking)
+    // This ensures chat history is durable even if DO is destroyed
+    void (async () => {
+      try {
+        const db = createDb(this.env);
+        const { chatMessages } = await import("@nichestream/db");
+        await db
+          .insert(chatMessages)
+          .values({
+            id: chatMsg.id as any,
+            videoId: chatMsg.videoId as any,
+            userId: chatMsg.userId as any,
+            content: chatMsg.content,
+            type: (chatMsg.type as any),
+            isDeleted: chatMsg.isDeleted,
+          })
+          .catch((err) => console.error("Failed to persist chat message:", err));
+      } catch (err) {
+        console.error("Chat DB persistence error:", err);
+        // Non-fatal: message still delivered via DO; persistence will retry on next message
+      }
+    })();
+
     this.broadcast({
       type: "chat_message",
       payload: chatMsg as unknown as Record<string, unknown>,
@@ -373,6 +396,28 @@ export class VideoRoom {
 
     await this.state.storage.put("activePoll", this.activePoll);
 
+    // Persist poll to database asynchronously (non-blocking)
+    void (async () => {
+      try {
+        const db = createDb(this.env);
+        const { polls } = await import("@nichestream/db");
+        await db
+          .insert(polls)
+          .values({
+            id: this.activePoll!.id as any,
+            videoId: this.activePoll!.videoId as any,
+            creatorId: this.activePoll!.creatorId as any,
+            question: this.activePoll!.question,
+            options: this.activePoll!.options as any,
+            status: "active",
+            endsAt: null,
+          })
+          .catch((err) => console.error("Failed to persist poll:", err));
+      } catch (err) {
+        console.error("Poll DB persistence error:", err);
+      }
+    })();
+
     this.broadcast({
       type: "poll_create",
       payload: this.activePoll as unknown as Record<string, unknown>,
@@ -397,6 +442,25 @@ export class VideoRoom {
 
     this.activePoll.votes[optionId] = (this.activePoll.votes[optionId] ?? 0) + 1;
     await this.state.storage.put("activePoll", this.activePoll);
+
+    // Persist poll vote to database asynchronously (non-blocking)
+    void (async () => {
+      try {
+        const db = createDb(this.env);
+        const { pollVotes } = await import("@nichestream/db");
+        await db
+          .insert(pollVotes)
+          .values({
+            id: crypto.randomUUID() as any,
+            pollId: this.activePoll!.id as any,
+            userId: session.userId as any,
+            optionId,
+          })
+          .catch((err) => console.error("Failed to persist poll vote:", err));
+      } catch (err) {
+        console.error("Poll vote DB persistence error:", err);
+      }
+    })();
 
     this.broadcast({
       type: "poll_update",

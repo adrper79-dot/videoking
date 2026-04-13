@@ -46,7 +46,7 @@ Generated: 2026-04-13 | Loop: 1
 | H-8 | 🟢 DONE | `apps/worker/src/routes/stripe.ts:~183` | Subscription cancel_url now uses creator.username instead of UUID |
 | H-9 | 🟢 DONE | `apps/worker/src/durable-objects/VideoRoom.ts:97,127` | Anonymous sessions now have per-session UUID `anon_${randomUUID()}`; no key collision |
 | H-10 | 🟢 DONE | `packages/db/src/schema/playlists.ts:15-26` | Added unique constraint on (playlistId, videoId); duplicates now prevented |
-| H-11 | 🔴 OPEN | `apps/worker/src/durable-objects/VideoRoom.ts` | Chat, polls, votes only in DO storage (100 msg cap, ephemeral) — DB tables defined but unused |
+| H-11 | � DONE | `apps/worker/src/durable-objects/VideoRoom.ts` | Chat messages, polls, and poll votes now persisted to database asynchronously; DO storage remains as ephemeral cache (last 100 messages) for live performance |
 | H-12 | 🟢 DONE | `apps/worker/wrangler.toml` | Added APP_BASE_URL to [vars]; now configured for BetterAuth + Stripe redirects |
 
 ---
@@ -97,12 +97,12 @@ Generated: 2026-04-13 | Loop: 1
 
 **Loop 1+2 Session Summary**:
 - **🟢 CRITICAL**: 8/9 fixed (C-1, C-2, C-3, C-4, C-5, C-6, C-7, C-8) | 1 partial/design-pending (C-9)
-- **🟢 HIGH**: 12/13 fixed (H-1, H-2, H-3, H-4, H-5, H-6, H-7, H-8, H-9, H-10, H-12) | 1 open (H-11)
+- **🟢 HIGH**: 13/13 fixed (H-1, H-2, H-3, H-4, H-5, H-6, H-7, H-8, H-9, H-10, H-11, H-12) | 0 open ✅
 - **🟢 MEDIUM**: 11/11 fixed (M-1, M-2, M-3, M-4, M-5, M-6, M-7, M-8, M-9, M-10, M-11) | 0 open ✅
 - **🟢 BUILD/CONFIG**: 5/6 fixed (BC-2, BC-3, BC-4, BC-5, BC-6) | 1 open (BC-1)
 - **🟢 CROSS-CUTTING**: 3/4 fixed (XC-2, XC-3, XC-4) | 1 in-progress (XC-1)
 
-**Summary**: 39 issues fixed (79%) | 1 design-pending (2%) | 4 remaining (8%) | 7 files created | 26+ files modified | All packages typecheck passing ✅
+**Summary**: 40 issues fixed (81%) | 1 design-pending (2%) | 3 remaining (6%) | 7 files created | 27+ files modified | All packages typecheck passing ✅
 
 **Loop 3 Changes (continued)**:
 - Created `apps/worker/src/middleware/session.ts` with requireSession() middleware
