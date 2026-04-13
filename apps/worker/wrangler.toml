@@ -16,16 +16,15 @@ tag = "v1"
 new_classes = ["VideoRoom", "UserPresence"]
 
 # Hyperdrive binding for low-latency access to Neon Postgres.
-# DEPLOYMENT STEP: Replace "YOUR_HYPERDRIVE_ID" with your actual Hyperdrive config ID.
+# The ID is loaded from the HYPERDRIVE_ID environment variable (see GitHub Actions secrets).
 # To get your Hyperdrive ID:
 #   1. Cloudflare dashboard → Workers & Pages → Hyperdrive
 #   2. Create a new config pointing at your Neon PostgreSQL connection string
 #   3. Copy the ID from the config details page
-#   4. Replace the value below: id = "YOUR_HYPERDRIVE_ID" → id = "abc123def456..."
-# Alternatively, set via environment: HYPERDRIVE_ID environment variable during wrangler deploy
+#   4. Set it as GitHub Secret: HYPERDRIVE_ID
 [[hyperdrive]]
 binding = "DB"
-id = "YOUR_HYPERDRIVE_ID"
+id = "${HYPERDRIVE_ID}"
 
 [[r2_buckets]]
 binding = "R2_BUCKET"
