@@ -10,6 +10,8 @@ export * from "./auth";
 // Phase 2: BlerdArt niche features
 export * from "./events";
 export * from "./assets";
+// Phase 3: Ad monetization
+export * from "./ads";
 
 // ─── Drizzle Relations (defined here to avoid circular imports) ───────────────
 import { relations } from "drizzle-orm";

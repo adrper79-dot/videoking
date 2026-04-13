@@ -1,7 +1,7 @@
 # NicheStream — Architecture Reference
 
 > **Last updated:** April 2026  
-> **Status:** Phase 1 complete, Phase 2 (ad insertion & platform-native checkout) in progress
+> **Status:** Phase 1 complete, Phase 2 (interactivity moat) complete, Phase 3 (monetization & ad tech) in planning
 
 ---
 
@@ -278,7 +278,107 @@ This is the canonical truth used by:
 
 ---
 
-## 6. Monorepo Layout
+## 6. Phase 3: Ad-Supported Monetization
+
+Phase 3 introduces a VAST-based ad tier to monetize free users while maintaining transparent creator payouts. This section documents the planned implementation.
+
+### 6.1 Ad-Tier Architecture
+
+**Data flow:**
+
+```
+Free User Watch (no Citizen tier)
+    ↓
+VideoPlayer component checks showAds flag from entitlements
+    ↓
+Stream player iframe URL includes ?ads=true query param
+    ↓
+Stream player injects VAST tag (or loads Google IMA SDK)
+    ↓
+Ad impression fires → browser logs to POST /api/ad-events
+    ↓
+ad_events table persists: (videoId, creatorId, adNetwork, estimatedRevenue, impressionAt)
+    ↓
+Monthly payout job: sum ad_revenue × engagement_weight → creator earnings
+    ↓
+Stripe Connect transfer includes ad revenue attribution
+```
+
+### 6.2 Schema Changes (Phase 3a: MVP)
+
+**New table: `ad_events`**
+
+```sql
+CREATE TABLE ad_events (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  video_id UUID REFERENCES videos(id) NOT NULL,
+  creator_id UUID REFERENCES users(id) NOT NULL,
+  ad_network TEXT, -- 'google_ima', 'custom_vast', etc
+  estimated_revenue_cents INT, -- CPM-based estimate
+  impression_at TIMESTAMP WITH TIMEZONE DEFAULT NOW(),
+  created_at TIMESTAMP WITH TIMEZONE DEFAULT NOW()
+);
+
+CREATE INDEX ad_events_creator_id ON ad_events(creator_id);
+CREATE INDEX ad_events_video_id ON ad_events(video_id);
+CREATE INDEX ad_events_impression_at ON ad_events(impression_at);
+```
+
+**Earnings table addition:**
+
+```sql
+ALTER TABLE earnings ADD COLUMN ad_event_id UUID REFERENCES ad_events(id);
+-- type column now includes: 'platform_subscription', 'video_unlock', 'platform_ad'
+```
+
+**User table addition (Phase 3c: Frequency capping):**
+
+```sql
+ALTER TABLE users ADD COLUMN last_ad_served_at TIMESTAMP WITH TIMEZONE;
+-- For per-user frequency limiting (max 1 ad per 10 minutes)
+```
+
+### 6.3 Implementation Milestones
+
+| Milestone | Owner | Timeline | Details |
+|---|---|---|---|
+| **3a** | Backend | Week 1 | Schema: create `ad_events` table + indexes; Worker: add `POST /api/ad-events` endpoint |
+| **3b** | Frontend | Week 2 | VideoPlayer: add `ads` query param logic; entitlements: inject `showAds` flag |
+| **3a** | Backend | Week 2 | Logging: asynchronous ad event persistence (non-blocking) + error handling |
+| **3c** | Backend | Week 3 | Attribution job: monthly ad_revenue allocation by engagement weight |
+| **3d** | Frontend | Week 3 | Dashboard: new "Earnings" tab breakdown (subscriptions vs. ads); Charts for ad impressions |
+| **3e** | DevOps | Week 4 | Partner with ad network (Google IMA or custom VAST source) + CPM testing |
+| **3f** | Frontend | Week 4 | Frequency capping UI: "Ad will resume in X seconds" tooltip for subsequent watches |
+
+### 6.4 Tier Privileges (Updated)
+
+| Feature | Free | Citizen | VIP |
+|---|---|---|---|
+| Ad impressions | Yes (1 per 10 min) | No | No |
+| Video access | Public only | All | All + exclusive |
+| Chat | Rate-limited (10s) | Unlimited (1s) | VIP badge (0.5s) |
+| Reactions | View only | Full | Full + reactions |
+| Watch party | Observe | Host/join | Host/join/private |
+
+### 6.5 Monetization Impact
+
+**Unit economics (with ads):**
+
+```
+Free user watch (10 min video):
+  → ~2 ad impressions @ $2 CPM → $0.004 per watch
+  → 20k free-tier watches/month → $80 ad revenue
+  → Creator share (65%) → ~$52/month from ad tier alone
+
+Blended ARPU (100k MAU, 80% free, 20% Citizen):
+  → Subscription: 20k × $1/monthly = $20k
+  → Ad revenue: 80k × $0.50 blended = $40k
+  → Blended ARPU: ($20k + $40k) / 100k = $0.60 per MAU
+```
+
+---
+
+## 7. Monorepo Layout
 
 ```
 videoking/
@@ -303,7 +403,7 @@ videoking/
 
 ---
 
-## 7. Environment Configuration
+## 8. Environment Configuration
 
 ### Worker (`apps/worker/.dev.vars` / Cloudflare secret bindings)
 
@@ -345,7 +445,7 @@ videoking/
 
 ---
 
-## 8. Deployment
+## 9. Deployment
 
 ### Worker
 ```bash
@@ -365,7 +465,7 @@ DATABASE_URL=postgres://... pnpm db:migrate
 
 ---
 
-## 9. Known Gaps & Roadmap (from Implementation Audit)
+## 10. Known Gaps & Roadmap (from Implementation Audit)
 
 | Priority | Gap | Impact |
 |---|---|---|

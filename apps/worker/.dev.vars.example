@@ -1,0 +1,31 @@
+# Cloudflare Worker Environment Variables (Development)
+# Copy this file to .dev.vars and fill in actual values
+# NEVER commit .dev.vars to git
+
+# BetterAuth (Session Management)
+BETTER_AUTH_SECRET=your-secret-key-here-min-32-chars
+
+# Cloudflare Stream
+STREAM_API_TOKEN=your-stream-api-token
+STREAM_ACCOUNT_ID=your-stream-account-id
+STREAM_CUSTOMER_DOMAIN=your-subdomain.cloudflarestream.com
+
+# Stripe
+STRIPE_SECRET_KEY=sk_test_xxxx
+STRIPE_WEBHOOK_SECRET=whsec_xxxx
+STRIPE_CITIZEN_MONTHLY_PRICE=price_xxxx
+STRIPE_CITIZEN_ANNUAL_PRICE=price_xxxx
+STRIPE_VIP_MONTHLY_PRICE=price_xxxx
+
+# Platform Configuration
+APP_BASE_URL=http://localhost:3000
+PLATFORM_FEE_PERCENT=20
+TRIAL_PERIOD_DAYS=14
+
+# Chat Rate Limits (milliseconds)
+CHAT_RATE_LIMIT_FREE_MS=10000
+CHAT_RATE_LIMIT_CITIZEN_MS=1000
+CHAT_RATE_LIMIT_VIP_MS=500
+
+# Database (via Hyperdrive binding in wrangler.toml)
+# HYPERDRIVE connection string configured in wrangler.toml, not here

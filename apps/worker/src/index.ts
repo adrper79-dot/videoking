@@ -12,6 +12,7 @@ import { moderationRoutes } from "./routes/moderation";
 import adminRouter from "./routes/admin";
 import eventsRouter from "./routes/events";
 import assetsRouter from "./routes/assets";
+import adsRouter from "./routes/ads";
 import { VideoRoom } from "./durable-objects/VideoRoom";
 import { UserPresence } from "./durable-objects/UserPresence";
 import { createDb } from "./lib/db";
@@ -100,7 +101,9 @@ app.route("/api/events", eventsRouter);
 // ─── Assets Routes ────────────────────────────────────────────────────────────
 
 app.route("/api/assets", assetsRouter);
+// ─── Ad Routes (Phase 3) ───────────────────────────────────────────────────────
 
+app.route("/api/ads", adsRouter);
 // ─── WebSocket: upgrade to VideoRoom Durable Object ──────────────────────────
 
 /**

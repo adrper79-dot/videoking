@@ -3,11 +3,14 @@
 import { useRef, useEffect } from "react";
 import { useVideoPlayer } from "@/hooks/useVideoPlayer";
 import { useVideoPlayback } from "./VideoPlaybackContext";
+import { logAdImpression } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 interface VideoPlayerProps {
   streamVideoId: string;
   title: string;
+  creatorId?: string;
+  showAds?: boolean;
   /** Pre-signed URL for private videos. Omit for public videos. */
   playbackUrl?: string;
   /** Cloudflare Stream customer subdomain (from API response). Omit when playbackUrl is provided. */
@@ -22,6 +25,8 @@ interface VideoPlayerProps {
 export function VideoPlayer({
   streamVideoId,
   title,
+  creatorId,
+  showAds = false,
   playbackUrl,
   customerSubdomain,
   className,
@@ -31,6 +36,17 @@ export function VideoPlayer({
     useVideoPlayer({ iframeRef });
   
   const { setCurrentTime } = useVideoPlayback();
+  
+  // Log ad impression on mount if showAds is true
+  useEffect(() => {
+    if (showAds && streamVideoId && creatorId) {
+      // Fire and forget; log after a short delay to ensure component stability
+      const timer = setTimeout(() => {
+        logAdImpression(streamVideoId, creatorId, "placeholder", 0);
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [showAds, streamVideoId, creatorId]);
   
   // Broadcast current playback time to context for watch party sync
   useEffect(() => {

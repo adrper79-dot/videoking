@@ -70,4 +70,26 @@ export const api = {
   },
 };
 
+/**
+ * Log an ad impression (Phase 3)
+ * Fire-and-forget; doesn't block user experience
+ */
+export async function logAdImpression(
+  videoId: string,
+  creatorId: string,
+  adNetwork: string = "placeholder",
+  estimatedRevenueCents: number = 0,
+) {
+  return fetch(`${API_BASE_URL}/api/ads/log-event`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      videoId,
+      creatorId,
+      adNetwork,
+      estimatedRevenueCents,
+    }),
+  }).catch((err) => console.error("Ad logging failed:", err));
+}
+
 export { ApiError };
