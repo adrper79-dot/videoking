@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { VideoCard } from "./VideoCard";
+import { DiscoveryFilters, type DiscoveryFilterState } from "./DiscoveryFilters";
 import { api } from "@/lib/api";
 import type { PaginatedResponse, Video } from "@nichestream/types";
 
@@ -13,13 +14,14 @@ type VideoWithCreator = Video & {
 
 interface VideoFeedProps {
   initialData: PaginatedResponse<Video> | null;
+  showFilters?: boolean;
 }
 
 /**
- * Infinite-scroll video feed. Accepts server-rendered initial data
- * and loads more pages as the user scrolls.
+ * Infinite-scroll video feed. Accepts server-rendered initial data,
+ * loads more pages as the user scrolls, and supports BlerdArt discovery filters.
  */
-export function VideoFeed({ initialData }: VideoFeedProps) {
+export function VideoFeed({ initialData, showFilters = true }: VideoFeedProps) {
   const [videos, setVideos] = useState<VideoWithCreator[]>(
     (initialData?.data as VideoWithCreator[]) ?? [],
   );
@@ -27,6 +29,14 @@ export function VideoFeed({ initialData }: VideoFeedProps) {
   const [hasMore, setHasMore] = useState(initialData?.hasMore ?? true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [filters, setFilters] = useState<DiscoveryFilterState>({});
+
+  // Reset pagination when filters change
+  useEffect(() => {
+    setVideos([]);
+    setPage(0);
+    setHasMore(true);
+  }, [filters]);
 
   const loadMore = useCallback(async () => {
     if (loading || !hasMore) return;
@@ -35,8 +45,16 @@ export function VideoFeed({ initialData }: VideoFeedProps) {
 
     try {
       const nextPage = page + 1;
+      const params = new URLSearchParams({
+        page: nextPage.toString(),
+        pageSize: '20',
+        ...(filters.style && { style: filters.style }),
+        ...(filters.tool && { tool: filters.tool }),
+        ...(filters.genre && { genre: filters.genre }),
+        ...(filters.search && { search: filters.search }),
+      });
       const data = await api.get<PaginatedResponse<VideoWithCreator>>(
-        `/api/videos?page=${nextPage}&pageSize=20`,
+        `/api/videos?${params}`,
       );
       setVideos((prev) => [...prev, ...data.data]);
       setPage(nextPage);
@@ -46,7 +64,7 @@ export function VideoFeed({ initialData }: VideoFeedProps) {
     } finally {
       setLoading(false);
     }
-  }, [loading, hasMore, page]);
+  }, [loading, hasMore, page, filters]);
 
   // Intersection Observer for infinite scroll
   useEffect(() => {
@@ -68,15 +86,20 @@ export function VideoFeed({ initialData }: VideoFeedProps) {
 
   if (videos.length === 0 && !loading) {
     return (
-      <div className="py-20 text-center text-neutral-400">
-        <p className="text-lg">No videos yet.</p>
-        <p className="mt-2 text-sm">Be the first to upload!</p>
+      <div className="space-y-6">
+        {showFilters && <DiscoveryFilters onFilter={setFilters} />}
+        <div className="py-20 text-center text-neutral-400">
+          <p className="text-lg">No videos found.</p>
+          <p className="mt-2 text-sm">Try adjusting your filters or check back later.</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div>
+    <div className="space-y-6">
+      {showFilters && <DiscoveryFilters onFilter={setFilters} loading={loading} />}
+      
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
         {videos.map((video) => (
           <VideoCard key={video.id} video={video} />
