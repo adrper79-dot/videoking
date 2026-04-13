@@ -296,4 +296,72 @@ stripeRouter.post("/unlock", async (c) => {
   }
 });
 
+/**
+ * POST /api/stripe/tip
+ * Creates a Stripe PaymentIntent for sending a tip to a creator.
+ * Amount validation and creator Stripe account ID are resolved server-side.
+ */
+stripeRouter.post("/tip", async (c) => {
+  const db = createDb(c.env);
+  const auth = createAuth(db, c.env);
+
+  const session = await auth.api.getSession({ headers: c.req.raw.headers });
+  if (!session?.user) {
+    return c.json({ error: "Unauthorized", message: "Authentication required" }, 401);
+  }
+
+  const stripe = createStripeClient(c.env);
+  const platformFeePercent = Number(c.env.PLATFORM_FEE_PERCENT ?? 20);
+
+  if (!Number.isFinite(platformFeePercent) || platformFeePercent < 0 || platformFeePercent > 100) {
+    return c.json({ error: "Misconfigured", message: "Invalid platform fee configuration" }, 500);
+  }
+
+  try {
+    const body = await c.req.json<{ creatorId: string; amountCents: number }>();
+
+    if (!body.creatorId || !body.amountCents) {
+      return c.json({ error: "ValidationError", message: "creatorId and amountCents required" }, 400);
+    }
+
+    // Validate amount: min 50 cents, max $999.99
+    if (body.amountCents < 50 || body.amountCents > 99999) {
+      return c.json({ error: "ValidationError", message: "Tip amount must be between $0.50 and $999.99" }, 400);
+    }
+
+    // Fetch creator's Stripe account from DB
+    const [creatorAccount] = await db
+      .select({ stripeAccountId: connectedAccounts.stripeAccountId })
+      .from(connectedAccounts)
+      .where(eq(connectedAccounts.userId, body.creatorId))
+      .limit(1);
+
+    if (!creatorAccount) {
+      return c.json({ error: "Unavailable", message: "Creator payment account not set up" }, 400);
+    }
+
+    const { platformFeeCents } = calculateFees(body.amountCents, platformFeePercent);
+
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: body.amountCents,
+      currency: "usd",
+      application_fee_amount: platformFeeCents,
+      transfer_data: { destination: creatorAccount.stripeAccountId },
+      metadata: {
+        creatorId: body.creatorId,
+        userId: session.user.id,
+        type: "tip",
+      },
+    });
+
+    return c.json({
+      clientSecret: paymentIntent.client_secret,
+      paymentIntentId: paymentIntent.id,
+    });
+  } catch (err) {
+    console.error("POST /api/stripe/tip error:", err);
+    return c.json({ error: "InternalError", message: "Failed to create payment" }, 500);
+  }
+});
+
 export { stripeRouter as stripeRoutes };

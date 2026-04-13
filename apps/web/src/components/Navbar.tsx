@@ -10,7 +10,7 @@ import { useEntitlements } from "./EntitlementsContext";
  */
 export function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const { entitlements } = useEntitlements();
+  const { entitlements, error, refetch } = useEntitlements();
 
   const navLinks = [
     { href: "/", label: "Home" },
@@ -26,6 +26,22 @@ export function Navbar() {
       className="fixed inset-x-0 top-0 z-50 border-b border-neutral-800 bg-neutral-950/95 backdrop-blur"
       aria-label="Main navigation"
     >
+      {/* Error notification banner */}
+      {error && (
+        <div className="border-b border-red-900/50 bg-red-950/50 px-4 py-2">
+          <div className="mx-auto flex max-w-7xl items-center justify-between gap-3">
+            <p className="text-sm text-red-200">
+              Failed to load profile. Some features may be limited.
+            </p>
+            <button
+              onClick={() => void refetch()}
+              className="rounded px-2 py-1 text-xs font-semibold text-red-300 hover:bg-red-900/30"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      )}
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2" aria-label="NicheStream home">

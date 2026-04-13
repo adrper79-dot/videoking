@@ -12,7 +12,7 @@ function getTrialDaysLeft(trialEndsAt: string | null | undefined): number | null
 
 export function PricingClient() {
   const searchParams = useSearchParams();
-  const { entitlements } = useEntitlements();
+  const { entitlements, error, refetch } = useEntitlements();
 
   const welcome = searchParams.get("welcome") === "1";
   const trialDaysLeft = getTrialDaysLeft(entitlements?.user?.trialEndsAt);
@@ -20,6 +20,21 @@ export function PricingClient() {
 
   return (
     <div className="space-y-10">
+      {error && (
+        <div className="rounded-lg border border-red-900/50 bg-red-950/30 p-4">
+          <div className="flex items-center justify-between gap-4">
+            <p className="text-sm text-red-200">
+              Unable to load your profile information. Some features may be limited.
+            </p>
+            <button
+              onClick={() => void refetch()}
+              className="flex-shrink-0 rounded px-3 py-1 text-xs font-semibold text-red-300 hover:bg-red-900/30"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      )}
       {welcome && entitlements?.user && (
         <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-5 text-sm text-emerald-100">
           Your account is live. {trialDaysLeft ? `Your Citizen trial is active for ${trialDaysLeft} more day${trialDaysLeft === 1 ? "" : "s"}.` : "Your account is ready."}

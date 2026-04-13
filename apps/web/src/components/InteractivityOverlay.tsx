@@ -28,7 +28,7 @@ export function InteractivityOverlay({ videoId }: InteractivityOverlayProps) {
   const [reactionCounts, setReactionCounts] = useState<Record<string, number>>({});
   const [connectedCount, setConnectedCount] = useState(0);
   const [notice, setNotice] = useState<string | null>(null);
-  const { entitlements } = useEntitlements();
+  const { entitlements, error, refetch } = useEntitlements();
 
   const userId = entitlements?.user?.id;
   const username = entitlements?.user?.username ?? "Guest";
@@ -106,6 +106,22 @@ export function InteractivityOverlay({ videoId }: InteractivityOverlayProps) {
 
   return (
     <div className="flex h-[calc(100vh-6rem)] flex-col overflow-hidden rounded-xl border border-neutral-800 bg-neutral-900">
+      {error && (
+        <div className="border-b border-red-900/50 bg-red-950/30 px-4 py-2">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-xs text-red-200">
+              Failed to load user info. Chat will use guest identity.
+            </p>
+            <button
+              onClick={() => void refetch()}
+              className="flex-shrink-0 rounded px-2 py-1 text-xs font-semibold text-red-300 hover:bg-red-900/30"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between border-b border-neutral-800 px-4 py-3">
         <div className="flex items-center gap-2">
