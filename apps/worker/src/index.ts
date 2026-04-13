@@ -1,5 +1,4 @@
 import { Hono } from "hono";
-import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { secureHeaders } from "hono/secure-headers";
 import type { Env } from "./types";
@@ -16,7 +15,8 @@ import { createDb } from "./lib/db";
 import { createAuth } from "./lib/auth";
 import { getVideoAnalytics } from "./lib/stream";
 import { videos, earnings } from "@nichestream/db";
-import { eq, desc, and, gte } from "drizzle-orm";
+import { subscriptions } from "@nichestream/db";
+import { eq, desc, and, gte, count } from "drizzle-orm";
 
 // Re-export Durable Object classes so Wrangler can bind them
 export { VideoRoom, UserPresence };
@@ -27,16 +27,33 @@ const app = new Hono<{ Bindings: Env }>();
 
 app.use("*", logger());
 app.use("*", secureHeaders());
-app.use(
-  "/api/*",
-  cors({
-    origin: (origin) => origin ?? "*",
-    allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-    allowHeaders: ["Content-Type", "Authorization", "stripe-signature"],
-    credentials: true,
-    maxAge: 86400,
-  }),
-);
+
+// CORS: explicit allowlist enforced per-request via env.APP_BASE_URL
+app.use("/api/*", async (c, next) => {
+  const origin = c.req.header("origin");
+  const appBase = c.env.APP_BASE_URL ?? "http://localhost:3000";
+  const allowed = new Set([appBase, "http://localhost:3000", "http://localhost:3001"]);
+
+  if (origin) {
+    if (!allowed.has(origin)) {
+      if (c.req.method === "OPTIONS") {
+        return new Response(null, { status: 204 });
+      }
+      return c.json({ error: "Forbidden", message: "Origin not allowed" }, 403);
+    }
+    c.header("Access-Control-Allow-Origin", origin);
+    c.header("Access-Control-Allow-Credentials", "true");
+    c.header("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS");
+    c.header("Access-Control-Allow-Headers", "Content-Type, Authorization, stripe-signature");
+    c.header("Access-Control-Max-Age", "86400");
+
+    if (c.req.method === "OPTIONS") {
+      return new Response(null, { status: 204 });
+    }
+  }
+
+  return next();
+});
 
 // ─── Health Check ─────────────────────────────────────────────────────────────
 
@@ -192,9 +209,21 @@ app.get("/api/dashboard/analytics", async (c) => {
 
     const recentVideos = await Promise.all(analyticsPromises);
 
+    // Count active subscribers for this creator
+    const [subCountRow] = await db
+      .select({ value: count() })
+      .from(subscriptions)
+      .where(
+        and(
+          eq(subscriptions.creatorId, session.user.id),
+          eq(subscriptions.status, "active"),
+        ),
+      );
+
     return c.json({
       totalViews: recentVideos.reduce((sum, v) => sum + v.views, 0),
       totalWatchTimeMinutes: recentVideos.reduce((sum, v) => sum + v.watchTimeMinutes, 0),
+      subscriberCount: subCountRow?.value ?? 0,
       recentVideos,
     });
   } catch (err) {

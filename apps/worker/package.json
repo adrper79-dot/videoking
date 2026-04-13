@@ -12,8 +12,10 @@
   "dependencies": {
     "@nichestream/db": "workspace:*",
     "@nichestream/types": "workspace:*",
+    "better-auth": "^1.0.0",
     "drizzle-orm": "^0.45.2",
     "hono": "^4.3.0",
+    "postgres": "^3.4.0",
     "stripe": "^15.0.0"
   },
   "devDependencies": {

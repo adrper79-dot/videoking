@@ -1,4 +1,4 @@
-import type { Hyperdrive, R2Bucket, DurableObjectNamespace, Fetcher } from "@cloudflare/workers-types";
+import type { Hyperdrive, R2Bucket, DurableObjectNamespace } from "@cloudflare/workers-types";
 
 /** Cloudflare Worker environment bindings for NicheStream API. */
 export interface Env {
@@ -31,6 +31,14 @@ export interface Env {
   USER_PRESENCE: DurableObjectNamespace;
   /** BetterAuth secret */
   BETTER_AUTH_SECRET: string;
-  /** Pages assets fetcher */
-  ASSETS: Fetcher;
+  /** Stripe price IDs used for plan validation */
+  STRIPE_CITIZEN_MONTHLY_PRICE?: string;
+  STRIPE_CITIZEN_ANNUAL_PRICE?: string;
+  STRIPE_VIP_MONTHLY_PRICE?: string;
+  /** Chat throttling controls by tier */
+  CHAT_RATE_LIMIT_FREE_MS?: string;
+  CHAT_RATE_LIMIT_CITIZEN_MS?: string;
+  CHAT_RATE_LIMIT_VIP_MS?: string;
+  /** Trial length in days */
+  TRIAL_PERIOD_DAYS?: string;
 }

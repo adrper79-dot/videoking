@@ -1,4 +1,4 @@
-import { pgEnum, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { boolean, index, integer, pgEnum, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import { users } from "./users";
 
 export const subscriptionPlanEnum = pgEnum("subscription_plan", ["monthly", "annual"]);
@@ -20,7 +20,12 @@ export const subscriptions = pgTable("subscriptions", {
   stripeCustomerId: text("stripe_customer_id").notNull(),
   plan: subscriptionPlanEnum("plan").notNull(),
   status: subscriptionStatusEnum("status").notNull().default("active"),
+  createdByTrial: boolean("created_by_trial").notNull().default(false),
+  trialPeriodDays: integer("trial_period_days").notNull().default(0),
   currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, (table) => ({
+  subscriberStatusIdx: index("subscriptions_subscriber_status_idx").on(table.subscriberId, table.status),
+  creatorStatusIdx: index("subscriptions_creator_status_idx").on(table.creatorId, table.status),
+}));
 

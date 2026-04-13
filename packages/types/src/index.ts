@@ -1,6 +1,8 @@
 // ─── User Types ──────────────────────────────────────────────────────────────
 
 export type UserRole = "viewer" | "creator" | "admin";
+export type UserTier = "free" | "citizen" | "vip";
+export type MembershipStatus = "none" | "trial" | "active" | "canceled" | "past_due";
 
 export interface User {
   id: string;
@@ -9,6 +11,10 @@ export interface User {
   displayName: string;
   avatarUrl: string | null;
   role: UserRole;
+  userTier: UserTier;
+  subscriptionStatus: MembershipStatus;
+  trialEndsAt: string | null;
+  hasSeenOnboarding: boolean;
   bio: string | null;
   website: string | null;
   createdAt: string;
@@ -39,11 +45,14 @@ export interface Video {
   durationSeconds: number | null;
   status: VideoStatus;
   visibility: VideoVisibility;
+  unlockPriceCents: number | null;
   viewsCount: number;
   likesCount: number;
   createdAt: string;
   updatedAt: string;
   publishedAt: string | null;
+  /** Cloudflare Stream customer subdomain for constructing embed URLs */
+  streamCustomerDomain?: string;
   creator?: PublicUser;
 }
 
@@ -113,6 +122,9 @@ export interface ChatMessage {
   type: ChatMessageType;
   isDeleted: boolean;
   createdAt: string;
+  username?: string;
+  avatarUrl?: string | null;
+  userTier?: UserTier;
   user?: PublicUser;
 }
 
@@ -162,6 +174,27 @@ export interface RoomState {
   recentMessages: ChatMessage[];
   activePoll: Poll | null;
   reactionCounts: Record<string, number>;
+}
+
+export interface AuthEntitlements {
+  authenticated: boolean;
+  user: {
+    id: string;
+    username: string;
+    displayName: string;
+    avatarUrl: string | null;
+    role: UserRole;
+    userTier: UserTier;
+    effectiveTier: UserTier;
+    subscriptionStatus: MembershipStatus;
+    trialEndsAt: string | null;
+  } | null;
+  limits: {
+    chatRateLimitMs: number;
+    canCreatePolls: boolean;
+    canUseWatchParty: boolean;
+    adFree: boolean;
+  };
 }
 
 // ─── Playlist Types ────────────────────────────────────────────────────────────
@@ -234,11 +267,9 @@ export interface PaginatedResponse<T> {
 
 export interface VideoAnalytics {
   videoId: string;
+  title?: string;
   views: number;
-  uniqueViewers: number;
   watchTimeMinutes: number;
-  averageViewDurationSeconds: number;
-  peakConcurrentViewers: number;
 }
 
 export interface DashboardAnalytics {

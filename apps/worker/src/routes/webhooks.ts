@@ -2,9 +2,10 @@ import { Hono } from "hono";
 import type { Env } from "../types";
 import { createDb } from "../lib/db";
 import { createStripeClient, verifyStripeWebhook, calculateFees } from "../lib/stripe";
-import { subscriptions, earnings, videoUnlocks } from "@nichestream/db";
-import { eq } from "drizzle-orm";
+import { subscriptions, earnings, users, videoUnlocks, processedWebhookEvents } from "@nichestream/db";
+import { and, eq } from "drizzle-orm";
 import type Stripe from "stripe";
+import { isTrialActive, syncUserMembershipStatus } from "../lib/entitlements";
 
 const webhooksRouter = new Hono<{ Bindings: Env }>();
 
@@ -13,6 +14,10 @@ const webhooksRouter = new Hono<{ Bindings: Env }>();
  * Handles Stripe webhook events. Verifies the signature before processing.
  */
 webhooksRouter.post("/stripe", async (c) => {
+  if (!c.env.STRIPE_WEBHOOK_SECRET) {
+    return c.json({ error: "Misconfigured", message: "Missing Stripe webhook secret" }, 500);
+  }
+
   const signature = c.req.header("stripe-signature");
 
   if (!signature) {
@@ -33,6 +38,25 @@ webhooksRouter.post("/stripe", async (c) => {
   const db = createDb(c.env);
   const platformFeePercent = Number(c.env.PLATFORM_FEE_PERCENT ?? 20);
 
+  // Idempotency: return 200 immediately if this event was already processed
+  const [alreadyProcessed] = await db
+    .select({ id: processedWebhookEvents.id })
+    .from(processedWebhookEvents)
+    .where(eq(processedWebhookEvents.id, event.id))
+    .limit(1);
+
+  if (alreadyProcessed) {
+    return c.json({ received: true });
+  }
+
+  // Record this event as processed before handling (prevents duplicate processing on retry)
+  try {
+    await db.insert(processedWebhookEvents).values({ id: event.id });
+  } catch {
+    // Concurrent duplicate — another instance already inserted, safe to skip
+    return c.json({ received: true });
+  }
+
   try {
     switch (event.type) {
       case "payment_intent.succeeded": {
@@ -41,19 +65,35 @@ webhooksRouter.post("/stripe", async (c) => {
         break;
       }
 
-      case "customer.subscription.created":
+      case "customer.subscription.created": {
+        const sub = event.data.object as Stripe.Subscription;
+        await handleSubscriptionUpdated(db, stripe, sub, platformFeePercent, true);
+        break;
+      }
+
       case "customer.subscription.updated": {
         const sub = event.data.object as Stripe.Subscription;
-        await handleSubscriptionUpdated(db, stripe, sub, platformFeePercent);
+        // On updates, sync membership state but do NOT insert new earnings records
+        await handleSubscriptionUpdated(db, stripe, sub, platformFeePercent, false);
         break;
       }
 
       case "customer.subscription.deleted": {
         const sub = event.data.object as Stripe.Subscription;
+        const [existing] = await db
+          .select({ subscriberId: subscriptions.subscriberId })
+          .from(subscriptions)
+          .where(eq(subscriptions.stripeSubscriptionId, sub.id))
+          .limit(1);
+
         await db
           .update(subscriptions)
           .set({ status: "canceled" })
           .where(eq(subscriptions.stripeSubscriptionId, sub.id));
+
+        if (existing?.subscriberId) {
+          await refreshUserMembershipState(db, existing.subscriberId, "canceled");
+        }
         break;
       }
 
@@ -123,9 +163,10 @@ async function handlePaymentIntentSucceeded(
 
 async function handleSubscriptionUpdated(
   db: ReturnType<typeof createDb>,
-  stripe: Stripe,
+  _stripe: Stripe,
   sub: Stripe.Subscription,
   platformFeePercent: number,
+  insertEarnings: boolean,
 ): Promise<void> {
   const { subscriberId, creatorId, plan } = sub.metadata ?? {};
 
@@ -162,8 +203,10 @@ async function handleSubscriptionUpdated(
     });
   }
 
-  // If newly active, record a subscription_share earning for creator
-  if (status === "active") {
+  await refreshUserMembershipState(db, subscriberId, status);
+
+  // Only insert earnings on subscription.created (insertEarnings flag), not on every renewal
+  if (insertEarnings && status === "active") {
     const grossAmountCents =
       (sub.items.data[0]?.price.unit_amount ?? 0) * (sub.items.data[0]?.quantity ?? 1);
 
@@ -183,6 +226,43 @@ async function handleSubscriptionUpdated(
       });
     }
   }
+}
+
+async function refreshUserMembershipState(
+  db: ReturnType<typeof createDb>,
+  subscriberId: string,
+  fallbackStatus: "active" | "canceled" | "past_due",
+): Promise<void> {
+  const [activeSubscription] = await db
+    .select({ id: subscriptions.id })
+    .from(subscriptions)
+    .where(
+      and(
+        eq(subscriptions.subscriberId, subscriberId),
+        eq(subscriptions.status, "active"),
+      ),
+    )
+    .limit(1);
+
+  if (activeSubscription) {
+    await syncUserMembershipStatus(db, subscriberId, {
+      userTier: "citizen",
+      subscriptionStatus: "active",
+    });
+    return;
+  }
+
+  const [user] = await db
+    .select({ trialEndsAt: users.trialEndsAt })
+    .from(users)
+    .where(eq(users.id, subscriberId))
+    .limit(1);
+
+  const nextStatus = isTrialActive(user?.trialEndsAt) ? "trial" : fallbackStatus;
+  await syncUserMembershipStatus(db, subscriberId, {
+    userTier: "free",
+    subscriptionStatus: nextStatus,
+  });
 }
 
 export { webhooksRouter as webhookRoutes };

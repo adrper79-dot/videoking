@@ -1,10 +1,15 @@
 import type { DurableObjectState, WebSocket } from "@cloudflare/workers-types";
-import type { ChatMessage, Poll, WSMessage, WSMessageType } from "@nichestream/types";
+import type { Poll, UserTier, WSMessage, WSMessageType } from "@nichestream/types";
+import type { Env } from "../types";
+import { createDb } from "../lib/db";
+import { createAuth } from "../lib/auth";
+import { getUserEntitlements } from "../lib/entitlements";
 
 interface Session {
   userId: string;
   username: string;
   avatarUrl: string | null;
+  userTier: UserTier;
   ws: WebSocket;
   lastMessageAt: number;
 }
@@ -14,8 +19,11 @@ interface StoredChatMessage {
   userId: string;
   username: string;
   avatarUrl: string | null;
+  videoId: string;
   content: string;
   type: "message" | "reaction" | "system";
+  isDeleted: boolean;
+  userTier: UserTier;
   createdAt: string;
 }
 
@@ -30,6 +38,7 @@ interface StoredChatMessage {
  */
 export class VideoRoom {
   private readonly state: DurableObjectState;
+  private readonly env: Env;
   private sessions: Map<string, Session> = new Map();
   private reactionCounts: Map<string, number> = new Map();
   private activePoll: (Poll & { votes: Record<string, number> }) | null = null;
@@ -46,8 +55,9 @@ export class VideoRoom {
     hostUserId: null,
   };
 
-  constructor(state: DurableObjectState) {
+  constructor(state: DurableObjectState, env: Env) {
     this.state = state;
+    this.env = env;
     // Restore persisted state on cold start
     this.state.blockConcurrencyWhile(async () => {
       const stored = await this.state.storage.get<StoredChatMessage[]>("chatHistory");
@@ -81,21 +91,45 @@ export class VideoRoom {
   }
 
   /** Upgrade connection to WebSocket using the hibernation API. */
-  private handleWebSocketUpgrade(request: Request): Response {
-    const url = new URL(request.url);
-    const userId = url.searchParams.get("userId") ?? "anonymous";
-    const username = url.searchParams.get("username") ?? "Guest";
-    const avatarUrl = url.searchParams.get("avatarUrl") ?? null;
+  private async handleWebSocketUpgrade(request: Request): Promise<Response> {
+    const videoId = this.getVideoId(request);
+    // Default to ephemeral anonymous identity — never trust client-supplied userId/userTier
+    let userId = `anon_${crypto.randomUUID()}`;
+    let username = "Guest";
+    let avatarUrl: string | null = null;
+    let userTier: UserTier = "free";
+
+    try {
+      const db = createDb(this.env);
+      const auth = createAuth(db, this.env);
+      const session = await auth.api.getSession({ headers: request.headers });
+
+      if (session?.user) {
+        userId = session.user.id;
+        const entitlements = await getUserEntitlements(db, session.user.id, this.env);
+        if (entitlements?.user) {
+          username = entitlements.user.username || entitlements.user.displayName;
+          avatarUrl = entitlements.user.avatarUrl;
+          userTier = entitlements.user.effectiveTier;
+        }
+      }
+    } catch (error) {
+      console.warn("VideoRoom session bootstrap failed:", error);
+      // Keep anonymous identity set above — do NOT fall back to client params
+    }
+
+    void videoId; // used for DO instance routing; keep reference to avoid lint warning
 
     const [client, server] = Object.values(new WebSocketPair()) as [WebSocket, WebSocket];
 
     // Tag the WebSocket so we can identify the session on wake-up
-    this.state.acceptWebSocket(server, [userId]);
+    this.state.acceptWebSocket(server, [userId, userTier, username, avatarUrl ?? "", videoId]);
 
     const session: Session = {
       userId,
       username,
       avatarUrl,
+      userTier,
       ws: server,
       lastMessageAt: 0,
     };
@@ -113,6 +147,7 @@ export class VideoRoom {
           userId,
           username,
           avatarUrl,
+          userTier,
           connectedCount: this.sessions.size,
         },
         timestamp: new Date().toISOString(),
@@ -134,8 +169,9 @@ export class VideoRoom {
     if (!this.sessions.has(userId)) {
       this.sessions.set(userId, {
         userId,
-        username: "Guest",
-        avatarUrl: null,
+        username: tags[2] ?? "Guest",
+        avatarUrl: tags[3] || null,
+        userTier: (tags[1] as UserTier | undefined) ?? "free",
         ws,
         lastMessageAt: 0,
       });
@@ -174,6 +210,7 @@ export class VideoRoom {
           action: "leave",
           userId,
           username: session.username,
+          userTier: session.userTier,
           connectedCount: this.sessions.size,
         },
         timestamp: new Date().toISOString(),
@@ -210,11 +247,18 @@ export class VideoRoom {
   /** Handle an incoming chat message with per-user rate limiting. */
   private async handleChatMessage(session: Session, msg: WSMessage): Promise<void> {
     const now = Date.now();
-    if (now - session.lastMessageAt < 1000) {
+    const minIntervalMs = this.getChatRateLimitMs(session.userTier);
+
+    if (now - session.lastMessageAt < minIntervalMs) {
       session.ws.send(
         JSON.stringify({
           type: "error",
-          payload: { message: "Rate limit: 1 message per second" },
+          payload: {
+            message:
+              session.userTier === "free"
+                ? "Free tier chat is limited. Upgrade to Citizen for faster chat access."
+                : `Rate limit: wait ${Math.ceil((minIntervalMs - (now - session.lastMessageAt)) / 1000)}s`,
+          },
           timestamp: new Date().toISOString(),
         }),
       );
@@ -227,11 +271,14 @@ export class VideoRoom {
 
     const chatMsg: StoredChatMessage = {
       id: crypto.randomUUID(),
+      videoId: this.getVideoIdFromSessions() ?? "",
       userId: session.userId,
       username: session.username,
       avatarUrl: session.avatarUrl,
       content,
       type: "message",
+      isDeleted: false,
+      userTier: session.userTier,
       createdAt: new Date().toISOString(),
     };
 
@@ -251,7 +298,7 @@ export class VideoRoom {
 
   /** Handle emoji reactions and broadcast updated counts. */
   private handleReaction(session: Session, msg: WSMessage): void {
-    const emoji = String(msg.payload["emoji"] ?? "❤️").slice(0, 2);
+    const emoji = ([...(String(msg.payload["emoji"] ?? "❤️"))][0] ?? "❤️").normalize();
     const current = this.reactionCounts.get(emoji) ?? 0;
     this.reactionCounts.set(emoji, current + 1);
 
@@ -274,6 +321,17 @@ export class VideoRoom {
 
   /** Allow the creator to create a new poll (only one active poll at a time). */
   private async handlePollCreate(session: Session, msg: WSMessage): Promise<void> {
+    if (session.userTier === "free") {
+      session.ws.send(
+        JSON.stringify({
+          type: "error",
+          payload: { message: "Poll creation is available to Citizen members." },
+          timestamp: new Date().toISOString(),
+        }),
+      );
+      return;
+    }
+
     if (this.activePoll) {
       session.ws.send(
         JSON.stringify({
@@ -303,7 +361,7 @@ export class VideoRoom {
 
     this.activePoll = {
       id: crypto.randomUUID(),
-      videoId: "",
+      videoId: this.getVideoIdFromSessions() ?? "",
       creatorId: session.userId,
       question,
       options,
@@ -353,6 +411,17 @@ export class VideoRoom {
 
   /** Handle watch party sync events (play/pause/seek from host). */
   private handleWatchPartySync(session: Session, msg: WSMessage): void {
+    if (session.userTier === "free") {
+      session.ws.send(
+        JSON.stringify({
+          type: "error",
+          payload: { message: "Watch Party hosting is a Citizen feature." },
+          timestamp: new Date().toISOString(),
+        }),
+      );
+      return;
+    }
+
     // Only the host or room creator can sync
     if (
       this.watchPartyState.hostUserId &&
@@ -404,6 +473,31 @@ export class VideoRoom {
       timestamp: new Date().toISOString(),
     };
     ws.send(JSON.stringify(stateMsg));
+  }
+
+  private getChatRateLimitMs(userTier: UserTier): number {
+    const configured =
+      userTier === "vip"
+        ? this.env.CHAT_RATE_LIMIT_VIP_MS
+        : userTier === "citizen"
+          ? this.env.CHAT_RATE_LIMIT_CITIZEN_MS
+          : this.env.CHAT_RATE_LIMIT_FREE_MS;
+
+    const parsed = Number(configured);
+    if (Number.isFinite(parsed) && parsed > 0) return parsed;
+
+    return userTier === "vip" ? 500 : userTier === "citizen" ? 1000 : 10_000;
+  }
+
+  private getVideoId(request: Request): string {
+    return new URL(request.url).pathname.split("/").filter(Boolean).pop() ?? "";
+  }
+
+  private getVideoIdFromSessions(): string | null {
+    const firstSocket = this.state.getWebSockets()[0];
+    if (!firstSocket) return null;
+    const tags = this.state.getTags(firstSocket);
+    return tags[4] ?? null;
   }
 
   /** Broadcast a message to all connected sessions, optionally excluding one. */

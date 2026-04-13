@@ -1,20 +1,23 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 
 interface WatchPartyProps {
   onSync: (isPlaying: boolean, currentTimeSeconds: number) => void;
+  canHost: boolean;
 }
 
 /**
  * Watch Party controls — the host can broadcast play/pause/seek events
  * to all viewers in the room via the Durable Object.
  */
-export function WatchParty({ onSync }: WatchPartyProps) {
+export function WatchParty({ onSync, canHost }: WatchPartyProps) {
   const [isHost, setIsHost] = useState(false);
   const [syncTime, setSyncTime] = useState("");
 
   function handleBecomeHost() {
+    if (!canHost) return;
     setIsHost(true);
   }
 
@@ -46,15 +49,28 @@ export function WatchParty({ onSync }: WatchPartyProps) {
 
       {!isHost ? (
         <div className="rounded-xl border border-neutral-700 bg-neutral-800 p-4 text-center">
-          <p className="mb-3 text-sm text-neutral-300">
-            Become the host to control playback for all viewers.
-          </p>
-          <button
-            onClick={handleBecomeHost}
-            className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700"
-          >
-            Become Host
-          </button>
+          {canHost ? (
+            <>
+              <p className="mb-3 text-sm text-neutral-300">
+                Become the host to control playback for all viewers.
+              </p>
+              <button
+                onClick={handleBecomeHost}
+                className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700"
+              >
+                Become Host
+              </button>
+            </>
+          ) : (
+            <>
+              <p className="mb-3 text-sm text-neutral-300">
+                Watch Party hosting is reserved for Citizen members to keep synced rooms reliable.
+              </p>
+              <Link href="/pricing" className="text-sm font-medium text-brand-400 hover:underline">
+                Upgrade for watch parties
+              </Link>
+            </>
+          )}
         </div>
       ) : (
         <div className="space-y-3">

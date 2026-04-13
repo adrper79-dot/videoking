@@ -9,6 +9,8 @@ interface VideoPlayerProps {
   title: string;
   /** Pre-signed URL for private videos. Omit for public videos. */
   playbackUrl?: string;
+  /** Cloudflare Stream customer subdomain (from API response). Omit when playbackUrl is provided. */
+  customerSubdomain?: string;
   className?: string;
 }
 
@@ -20,15 +22,20 @@ export function VideoPlayer({
   streamVideoId,
   title,
   playbackUrl,
+  customerSubdomain,
   className,
 }: VideoPlayerProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const { isPlaying, currentTime, duration, volume, isMuted, play, pause, seek, setVolume, toggleMute, toggleFullscreen } =
     useVideoPlayer({ iframeRef });
 
+  const streamDomain = customerSubdomain
+    ? `customer-${customerSubdomain}.cloudflarestream.com`
+    : "customer-stream.cloudflarestream.com"; // fallback — configure customerSubdomain from API
+
   const src =
     playbackUrl ??
-    `https://customer-stream.cloudflarestream.com/${streamVideoId}/iframe?preload=auto&loop=false`;
+    `https://${streamDomain}/${streamVideoId}/iframe?preload=auto&loop=false`;
 
   const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
 

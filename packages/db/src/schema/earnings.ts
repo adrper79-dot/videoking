@@ -1,4 +1,4 @@
-import { boolean, pgEnum, pgTable, text, timestamp, uuid, integer } from "drizzle-orm/pg-core";
+import { boolean, index, pgEnum, pgTable, text, timestamp, uuid, integer } from "drizzle-orm/pg-core";
 import { users } from "./users";
 import { videos } from "./videos";
 
@@ -28,7 +28,9 @@ export const earnings = pgTable("earnings", {
   stripePaymentIntentId: text("stripe_payment_intent_id"),
   status: earningStatusEnum("status").notNull().default("pending"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, (table) => ({
+  creatorCreatedAtIdx: index("earnings_creator_created_at_idx").on(table.creatorId, table.createdAt),
+}));
 
 export const connectedAccounts = pgTable("connected_accounts", {
   id: uuid("id").primaryKey().defaultRandom(),

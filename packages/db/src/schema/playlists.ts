@@ -1,4 +1,4 @@
-import { integer, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { integer, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { users } from "./users";
 import { videos } from "./videos";
 
@@ -22,4 +22,6 @@ export const playlistVideos = pgTable("playlist_videos", {
     .references(() => videos.id, { onDelete: "cascade" }),
   position: integer("position").notNull().default(0),
   addedAt: timestamp("added_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, (table) => ({
+  uniquePlaylistVideo: uniqueIndex("playlist_videos_unique_idx").on(table.playlistId, table.videoId),
+}));

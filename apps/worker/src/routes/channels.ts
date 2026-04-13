@@ -38,7 +38,13 @@ channelsRouter.get("/:username", async (c) => {
     const recentVideos = await db
       .select()
       .from(videos)
-      .where(eq(videos.creatorId, creator.id))
+      .where(
+        and(
+          eq(videos.creatorId, creator.id),
+          eq(videos.status, "ready"),
+          eq(videos.visibility, "public"),
+        ),
+      )
       .orderBy(desc(videos.publishedAt))
       .limit(12);
 

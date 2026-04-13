@@ -6,6 +6,7 @@ export * from "./earnings";
 export * from "./interactions";
 export * from "./playlists";
 export * from "./moderation";
+export * from "./auth";
 
 // ─── Drizzle Relations (defined here to avoid circular imports) ───────────────
 import { relations } from "drizzle-orm";

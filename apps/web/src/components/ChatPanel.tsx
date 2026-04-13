@@ -1,19 +1,27 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { ChatMessage } from "@nichestream/types";
+import type { ChatMessage, UserTier } from "@nichestream/types";
 import { timeAgo } from "@/lib/utils";
 
 interface ChatPanelProps {
   messages: ChatMessage[];
   onSend: (content: string) => void;
   isConnected: boolean;
+  currentTier: UserTier;
+  chatRateLimitMs?: number;
 }
 
 /**
  * Live chat panel with auto-scroll and message input.
  */
-export function ChatPanel({ messages, onSend, isConnected }: ChatPanelProps) {
+export function ChatPanel({
+  messages,
+  onSend,
+  isConnected,
+  currentTier,
+  chatRateLimitMs,
+}: ChatPanelProps) {
   const [input, setInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -67,9 +75,18 @@ export function ChatPanel({ messages, onSend, isConnected }: ChatPanelProps) {
               ).toUpperCase()}
             </div>
             <div className="min-w-0 flex-1">
-              <span className="font-medium text-brand-400">
-                {(msg as ChatMessage & { username?: string }).username ?? "Guest"}
-              </span>{" "}
+              <span className="font-medium text-brand-400">{msg.username ?? "Guest"}</span>
+              {msg.userTier && msg.userTier !== "free" && (
+                <span
+                  className={
+                    msg.userTier === "vip"
+                      ? "ml-2 rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-300"
+                      : "ml-2 rounded-full bg-sky-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-300"
+                  }
+                >
+                  {msg.userTier === "vip" ? "VIP" : "Citizen"}
+                </span>
+              )}{" "}
               <span className="break-words text-neutral-200">{msg.content}</span>
               <span className="ml-1 text-[10px] text-neutral-600">
                 {timeAgo(msg.createdAt)}
@@ -106,6 +123,11 @@ export function ChatPanel({ messages, onSend, isConnected }: ChatPanelProps) {
             Send
           </button>
         </div>
+        {currentTier === "free" && isConnected && (
+          <p className="mt-2 text-xs text-neutral-500">
+            Free tier chat is rate-limited to roughly one message every {Math.max(1, Math.ceil((chatRateLimitMs ?? 10000) / 1000))}s.
+          </p>
+        )}
       </form>
     </div>
   );

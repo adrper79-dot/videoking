@@ -1,10 +1,10 @@
 import { Hono } from "hono";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import type { Env } from "../types";
 import { createDb } from "../lib/db";
 import { createAuth } from "../lib/auth";
 import { createStripeClient, createConnectAccountAndLink, calculateFees } from "../lib/stripe";
-import { connectedAccounts, users, earnings, videoUnlocks, videos } from "@nichestream/db";
+import { connectedAccounts, users, videoUnlocks, videos } from "@nichestream/db";
 
 const stripeRouter = new Hono<{ Bindings: Env }>();
 
@@ -130,6 +130,7 @@ stripeRouter.get("/connect/status", async (c) => {
 /**
  * POST /api/stripe/subscriptions
  * Creates a Stripe Checkout Session for subscribing to a creator.
+ * Routes platform fee and creator share via application_fee_amount.
  */
 stripeRouter.post("/subscriptions", async (c) => {
   const db = createDb(c.env);
@@ -149,12 +150,36 @@ stripeRouter.post("/subscriptions", async (c) => {
       priceId: string;
     }>();
 
+    if (!body.creatorId || !body.priceId || !["monthly", "annual"].includes(body.plan)) {
+      return c.json({ error: "ValidationError", message: "Invalid subscription request" }, 400);
+    }
+
+    const expectedPriceId =
+      body.plan === "annual"
+        ? c.env.STRIPE_CITIZEN_ANNUAL_PRICE
+        : c.env.STRIPE_CITIZEN_MONTHLY_PRICE;
+
+    if (expectedPriceId && body.priceId !== expectedPriceId) {
+      return c.json({ error: "ValidationError", message: "Unexpected price selected" }, 400);
+    }
+
+    // Fetch creator username for cancel_url and their Stripe account for revenue routing
+    const [creator] = await db
+      .select({ username: users.username })
+      .from(users)
+      .where(eq(users.id, body.creatorId))
+      .limit(1);
+
+    if (!creator) {
+      return c.json({ error: "NotFound", message: "Creator not found" }, 404);
+    }
+
     const checkoutSession = await stripe.checkout.sessions.create({
       mode: "subscription",
       payment_method_types: ["card"],
       line_items: [{ price: body.priceId, quantity: 1 }],
       success_url: `${c.env.APP_BASE_URL}/dashboard?subscription=success`,
-      cancel_url: `${c.env.APP_BASE_URL}/channel/${body.creatorId}`,
+      cancel_url: `${c.env.APP_BASE_URL}/channel/${creator.username}`,
       metadata: {
         subscriberId: session.user.id,
         creatorId: body.creatorId,
@@ -175,6 +200,7 @@ stripeRouter.post("/subscriptions", async (c) => {
 /**
  * POST /api/stripe/unlock
  * Creates a Stripe PaymentIntent for unlocking a pay-per-view video.
+ * Amount and creator Stripe account ID are resolved server-side from the DB.
  */
 stripeRouter.post("/unlock", async (c) => {
   const db = createDb(c.env);
@@ -188,20 +214,25 @@ stripeRouter.post("/unlock", async (c) => {
   const stripe = createStripeClient(c.env);
   const platformFeePercent = Number(c.env.PLATFORM_FEE_PERCENT ?? 20);
 
-  try {
-    const body = await c.req.json<{
-      videoId: string;
-      amountCents: number;
-      creatorStripeAccountId: string;
-    }>();
+  if (!Number.isFinite(platformFeePercent) || platformFeePercent < 0 || platformFeePercent > 100) {
+    return c.json({ error: "Misconfigured", message: "Invalid platform fee configuration" }, 500);
+  }
 
-    if (!body.videoId || !body.amountCents || body.amountCents < 50) {
-      return c.json({ error: "ValidationError", message: "Invalid amount" }, 400);
+  try {
+    const body = await c.req.json<{ videoId: string }>();
+
+    if (!body.videoId) {
+      return c.json({ error: "ValidationError", message: "videoId required" }, 400);
     }
 
-    // Check video exists and is unlocked_only
+    // Fetch video with unlock price from DB — never trust client-supplied amount
     const [video] = await db
-      .select()
+      .select({
+        id: videos.id,
+        visibility: videos.visibility,
+        creatorId: videos.creatorId,
+        unlockPriceCents: videos.unlockPriceCents,
+      })
       .from(videos)
       .where(eq(videos.id, body.videoId))
       .limit(1);
@@ -210,24 +241,44 @@ stripeRouter.post("/unlock", async (c) => {
       return c.json({ error: "NotFound", message: "Video not found" }, 404);
     }
 
+    if (!video.unlockPriceCents || video.unlockPriceCents < 50) {
+      return c.json({ error: "Misconfigured", message: "Video unlock price not set" }, 400);
+    }
+
     // Check if already unlocked
     const [existingUnlock] = await db
       .select()
       .from(videoUnlocks)
-      .where(eq(videoUnlocks.videoId, body.videoId))
+      .where(
+        and(
+          eq(videoUnlocks.videoId, body.videoId),
+          eq(videoUnlocks.userId, session.user.id),
+        ),
+      )
       .limit(1);
 
-    if (existingUnlock && existingUnlock.userId === session.user.id) {
+    if (existingUnlock) {
       return c.json({ error: "AlreadyUnlocked", message: "Video already unlocked" }, 400);
     }
 
-    const { platformFeeCents } = calculateFees(body.amountCents, platformFeePercent);
+    // Fetch creator Stripe account from DB — never trust client-supplied account ID
+    const [creatorAccount] = await db
+      .select({ stripeAccountId: connectedAccounts.stripeAccountId })
+      .from(connectedAccounts)
+      .where(eq(connectedAccounts.userId, video.creatorId))
+      .limit(1);
+
+    if (!creatorAccount) {
+      return c.json({ error: "Unavailable", message: "Creator payment account not set up" }, 400);
+    }
+
+    const { platformFeeCents } = calculateFees(video.unlockPriceCents, platformFeePercent);
 
     const paymentIntent = await stripe.paymentIntents.create({
-      amount: body.amountCents,
+      amount: video.unlockPriceCents,
       currency: "usd",
       application_fee_amount: platformFeeCents,
-      transfer_data: { destination: body.creatorStripeAccountId },
+      transfer_data: { destination: creatorAccount.stripeAccountId },
       metadata: {
         videoId: body.videoId,
         userId: session.user.id,

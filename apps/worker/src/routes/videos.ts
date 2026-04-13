@@ -3,8 +3,9 @@ import { eq, desc, and, sql } from "drizzle-orm";
 import type { Env } from "../types";
 import { createDb } from "../lib/db";
 import { createAuth } from "../lib/auth";
+import { getUserEntitlements } from "../lib/entitlements";
 import { getDirectUploadUrl, getSignedStreamUrl } from "../lib/stream";
-import { videos, users } from "@nichestream/db";
+import { subscriptions, users, videoUnlocks, videos } from "@nichestream/db";
 
 const videosRouter = new Hono<{ Bindings: Env }>();
 
@@ -97,8 +98,43 @@ videosRouter.get("/:id", async (c) => {
 
       // Creator always has access
       if (session.user.id !== video.creatorId) {
-        // TODO: check subscription / unlock status
-        return c.json({ error: "Forbidden", message: "Access denied" }, 403);
+        const entitlements = await getUserEntitlements(db, session.user.id, c.env);
+        let hasAccess = entitlements?.user?.effectiveTier !== "free";
+
+        if (video.visibility === "subscribers_only" && !hasAccess) {
+          const [subscription] = await db
+            .select({ id: subscriptions.id })
+            .from(subscriptions)
+            .where(
+              and(
+                eq(subscriptions.subscriberId, session.user.id),
+                eq(subscriptions.creatorId, video.creatorId),
+                eq(subscriptions.status, "active"),
+              ),
+            )
+            .limit(1);
+
+          hasAccess = Boolean(subscription);
+        }
+
+        if (video.visibility === "unlocked_only" && !hasAccess) {
+          const [unlock] = await db
+            .select({ id: videoUnlocks.id })
+            .from(videoUnlocks)
+            .where(
+              and(
+                eq(videoUnlocks.videoId, video.id),
+                eq(videoUnlocks.userId, session.user.id),
+              ),
+            )
+            .limit(1);
+
+          hasAccess = Boolean(unlock);
+        }
+
+        if (!hasAccess) {
+          return c.json({ error: "Forbidden", message: "Access denied" }, 403);
+        }
       }
     }
 
@@ -121,6 +157,7 @@ videosRouter.get("/:id", async (c) => {
     return c.json({
       ...video,
       playbackUrl,
+      streamCustomerDomain: c.env.STREAM_CUSTOMER_DOMAIN ?? null,
       creator: creator
         ? {
             id: creator.id,

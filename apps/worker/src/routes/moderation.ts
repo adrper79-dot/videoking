@@ -3,7 +3,8 @@ import { eq, desc } from "drizzle-orm";
 import type { Env } from "../types";
 import { createDb } from "../lib/db";
 import { createAuth } from "../lib/auth";
-import { moderationReports, users, videos } from "@nichestream/db";
+import { requireAdmin } from "../middleware/admin";
+import { moderationReports, videos } from "@nichestream/db";
 
 const moderationRouter = new Hono<{ Bindings: Env }>();
 
@@ -52,25 +53,8 @@ moderationRouter.post("/report", async (c) => {
  * GET /api/moderation/reports
  * Admin-only: List pending moderation reports.
  */
-moderationRouter.get("/reports", async (c) => {
+moderationRouter.get("/reports", requireAdmin(), async (c) => {
   const db = createDb(c.env);
-  const auth = createAuth(db, c.env);
-
-  const session = await auth.api.getSession({ headers: c.req.raw.headers });
-  if (!session?.user) {
-    return c.json({ error: "Unauthorized", message: "Authentication required" }, 401);
-  }
-
-  // Check admin role
-  const [user] = await db
-    .select({ role: users.role })
-    .from(users)
-    .where(eq(users.id, session.user.id))
-    .limit(1);
-
-  if (!user || user.role !== "admin") {
-    return c.json({ error: "Forbidden", message: "Admin access required" }, 403);
-  }
 
   try {
     const reports = await db
@@ -91,25 +75,9 @@ moderationRouter.get("/reports", async (c) => {
  * PATCH /api/moderation/reports/:id
  * Admin-only: Resolve or dismiss a report.
  */
-moderationRouter.patch("/reports/:id", async (c) => {
+moderationRouter.patch("/reports/:id", requireAdmin(), async (c) => {
   const db = createDb(c.env);
-  const auth = createAuth(db, c.env);
   const reportId = c.req.param("id");
-
-  const session = await auth.api.getSession({ headers: c.req.raw.headers });
-  if (!session?.user) {
-    return c.json({ error: "Unauthorized", message: "Authentication required" }, 401);
-  }
-
-  const [user] = await db
-    .select({ role: users.role })
-    .from(users)
-    .where(eq(users.id, session.user.id))
-    .limit(1);
-
-  if (!user || user.role !== "admin") {
-    return c.json({ error: "Forbidden", message: "Admin access required" }, 403);
-  }
 
   try {
     const body = await c.req.json<{

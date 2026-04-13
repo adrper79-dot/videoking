@@ -42,7 +42,7 @@ nichestream/
 - **Reactions** — Emoji reaction counts synced across all viewers
 - **Watch Party** — Host-controlled synchronized playback for all room members
 - **Creator Dashboard** — Upload, analytics (via Stream API), and earnings overview
-- **Monetization** — Stripe Connect Express: subscriptions, pay-per-view unlocks, tips
+- **Monetization** — Hybrid freemium (AVOD + SVOD): free tier ads + low-friction subscriptions via Stripe
 - **Auth** — BetterAuth email/password with session management
 - **Moderation** — Content reporting and admin resolution flow
 - **PWA** — Web app manifest for installability
@@ -79,6 +79,13 @@ STRIPE_SECRET_KEY=sk_test_...
 STRIPE_WEBHOOK_SECRET=whsec_...
 APP_BASE_URL=http://localhost:3000
 PLATFORM_FEE_PERCENT=20
+STRIPE_CITIZEN_MONTHLY_PRICE=price_monthly_...
+STRIPE_CITIZEN_ANNUAL_PRICE=price_annual_...
+STRIPE_VIP_MONTHLY_PRICE=price_vip_...
+CHAT_RATE_LIMIT_FREE_MS=10000
+CHAT_RATE_LIMIT_CITIZEN_MS=1000
+CHAT_RATE_LIMIT_VIP_MS=500
+TRIAL_PERIOD_DAYS=14
 ```
 
 **Web** (`apps/web/.env.local`):
@@ -87,6 +94,7 @@ NEXT_PUBLIC_API_URL=http://localhost:8787
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 # Stripe Price ID for the monthly subscription plan (create in Stripe dashboard)
 NEXT_PUBLIC_SUBSCRIPTION_PRICE_MONTHLY=price_...
+NEXT_PUBLIC_SUBSCRIPTION_PRICE_ANNUAL=price_...
 ```
 
 ### 3. Set up the database
@@ -158,11 +166,91 @@ cd apps/web && pnpm build && pnpm deploy
 
 **UserPresence** — One instance per `userId`. Tracks online/offline with `lastSeen` timestamp.
 
-### Monetization Flow
+### Monetization Flow (2026 Hybrid Freemium)
 
-1. Creator completes Stripe Connect Express onboarding
-2. Viewer subscribes → Stripe Checkout → webhook creates `subscriptions` + `earnings` rows
-3. Platform retains configured fee percentage; creator receives the net via Stripe Connect transfers
+#### Tier Model
+
+**Free Tier (Guest/Non-Citizen)**
+- Free access to browse/watch public videos and basic discovery
+- Light, non-intrusive ad load (pre-roll, sponsored polls, dynamic overlays)
+- Limited chat/reactions and optional viewing caps (per day/week)
+- Standard quality and reduced advanced interactivity
+
+**Citizen Tier ($1/month or $10/year)**
+- Ad-free (or near ad-free) viewing
+- Full interactivity: unlimited chat with badges/priority, advanced polls/quizzes, synced watch parties
+- Unlimited access, richer personalization, and PWA/offline progress sync
+- Primary conversion target for recurring revenue
+
+**VIP Citizen Tier ($5-$9/month, optional)**
+- Everything in Citizen plus super-fan perks (exclusive content/AMAs, private rooms, priority support, higher quality options)
+- Natural upgrade path that lifts blended ARPU
+
+#### Revenue Mix
+
+1. Free tier generates baseline ad revenue from high-volume casual viewers
+2. Citizen/VIP subscriptions generate predictable recurring revenue via Stripe Billing
+3. Revenue is attributed by views + interaction depth and split to creators (typically 60-70%) via Stripe Connect
+4. Platform retains the remainder after creator split and payment processing fees
+
+This hybrid structure balances acquisition and margin better than ad-only or subscription-only models for early-stage niche platforms.
+
+### Hybrid Gating and Entitlements
+
+- **Neon + Drizzle**: Store and query `user_tier`, `subscription_status`, entitlement flags, and ad preferences
+- **Stripe Webhooks**: Update entitlements immediately after checkout, renewal, cancellation, and payment retries
+- **Cloudflare Stream**: Signed playback URLs + ad-tag injection logic per tier
+- **Durable Objects**: Enforce tier permissions in real-time rooms (rate limits, badge privileges, premium feature access)
+
+### Retention and Conversion Layer
+
+- 7-14 day Citizen trial to reduce first-purchase friction
+- Annual plan discount ($10/year) to improve cash flow and reduce voluntary churn
+- Contextual upgrade nudges during high-intent moments (chat limits, watch party entry, advanced poll participation)
+- Community events and creator-exclusive interactivity to increase stickiness
+- Churn instrumentation by tier with watch-time and interaction-depth cohorts
+
+### Ad Tech Maturity Path
+
+1. **Phase 1**: Client-side VAST tags in Stream player for free-tier inventory
+2. **Phase 2**: Worker-managed targeting/frequency capping and sponsored interactive units
+3. **Phase 3**: Server-side dynamic ad insertion optimizations for better fill and CPM
+
+### Creator Earnings and Attribution
+
+- Combine ad revenue and subscription pools into transparent creator payout calculations
+- Attribute shares using weighted engagement signals (watch time, interactive actions, session quality)
+- Expose clear payout breakdowns in dashboard (ad revenue, sub revenue, adjustments, net transfer)
+- Keep payout operations on Stripe Connect Express for scalable global disbursements
+
+### Phase 1 Execution Priorities
+
+Ship with hybrid monetization on day one:
+
+1. Core video feed/player + auth
+2. Free/Citizen tier gating and entitlement checks
+3. $1 monthly + $10 annual Stripe Billing plans
+4. Basic VAST ad insertion for free users only
+5. Stripe Connect creator payout baseline
+6. Initial retention hooks (trial + upgrade nudges + churn tracking)
+
+### Plan Addendum for Agent Prompting
+
+Append this block to any implementation-planning prompt:
+
+```text
+MONETIZATION ADDENDUM (Implement this hybrid model exactly):
+
+- Free Tier: Light ads (VAST/dynamic via Stream Player), limited chat/reactions, video limits.
+- Citizen Tier: $1/month recurring via Stripe Billing (with annual $10 option). Unlocks ad-free + full interactivity (unlimited chat with badges, advanced polls, watch parties), unlimited access.
+- Optional VIP Tier: $5-9/month for exclusive perks.
+- Use Stripe Connect for creator revenue shares across all sources (ads + subs), attributed by engagement metrics.
+- Gating: Neon roles + signed Stream URLs + Durable Object permissions.
+- Retention features: Trials, upgrade nudges during high-engagement moments, churn tracking.
+- Prioritize Phase 1: Core video + auth + hybrid tiering + basic ad insertion + Stripe Connect payouts.
+
+Update all architecture, schema, frontend, and dashboard sections to support this hybrid model. Start Phase 1 with the improved monetization from day one.
+```
 
 ---
 

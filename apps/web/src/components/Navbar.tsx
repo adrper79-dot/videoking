@@ -1,20 +1,43 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import type { AuthEntitlements } from "@nichestream/types";
 
 /**
  * Top navigation bar with logo, main links, and mobile menu.
  */
 export function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [entitlements, setEntitlements] = useState<AuthEntitlements | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+
+    void api
+      .get<AuthEntitlements>("/api/auth/entitlements")
+      .then((data) => {
+        if (mounted) setEntitlements(data);
+      })
+      .catch(() => {
+        if (mounted) setEntitlements(null);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const navLinks = [
     { href: "/", label: "Home" },
     { href: "/dashboard", label: "Dashboard" },
     { href: "/dashboard/upload", label: "Upload" },
   ];
+
+  const effectiveTier = entitlements?.user?.effectiveTier ?? "free";
+  const isAuthenticated = entitlements?.authenticated ?? false;
 
   return (
     <nav
@@ -52,18 +75,36 @@ export function Navbar() {
 
         {/* Auth buttons */}
         <div className="hidden items-center gap-2 md:flex">
-          <Link
-            href="/sign-in"
-            className="rounded-lg px-3 py-2 text-sm text-neutral-300 transition hover:text-white"
-          >
-            Sign In
-          </Link>
-          <Link
-            href="/sign-up"
-            className="rounded-lg bg-brand-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-brand-700"
-          >
-            Get Started
-          </Link>
+          {isAuthenticated ? (
+            <>
+              <span className="rounded-full border border-neutral-700 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-neutral-200">
+                {effectiveTier}
+              </span>
+              {effectiveTier === "free" && (
+                <Link
+                  href="/pricing"
+                  className="rounded-lg bg-brand-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-brand-700"
+                >
+                  Upgrade
+                </Link>
+              )}
+            </>
+          ) : (
+            <>
+              <Link
+                href="/sign-in"
+                className="rounded-lg px-3 py-2 text-sm text-neutral-300 transition hover:text-white"
+              >
+                Sign In
+              </Link>
+              <Link
+                href="/pricing"
+                className="rounded-lg bg-brand-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-brand-700"
+              >
+                Get Started
+              </Link>
+            </>
+          )}
         </div>
 
         {/* Mobile menu button */}
@@ -118,20 +159,39 @@ export function Navbar() {
               </Link>
             ))}
             <hr className="my-2 border-neutral-800" />
-            <Link
-              href="/sign-in"
-              onClick={() => setMobileOpen(false)}
-              className="rounded-lg px-3 py-2.5 text-sm text-neutral-300 hover:bg-neutral-800 hover:text-white"
-            >
-              Sign In
-            </Link>
-            <Link
-              href="/sign-up"
-              onClick={() => setMobileOpen(false)}
-              className="rounded-lg bg-brand-600 px-3 py-2.5 text-center text-sm font-semibold text-white hover:bg-brand-700"
-            >
-              Get Started
-            </Link>
+            {isAuthenticated ? (
+              <>
+                <div className="rounded-lg border border-neutral-800 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-neutral-300">
+                  Current tier: {effectiveTier}
+                </div>
+                {effectiveTier === "free" && (
+                  <Link
+                    href="/pricing"
+                    onClick={() => setMobileOpen(false)}
+                    className="rounded-lg bg-brand-600 px-3 py-2.5 text-center text-sm font-semibold text-white hover:bg-brand-700"
+                  >
+                    Upgrade
+                  </Link>
+                )}
+              </>
+            ) : (
+              <>
+                <Link
+                  href="/sign-in"
+                  onClick={() => setMobileOpen(false)}
+                  className="rounded-lg px-3 py-2.5 text-sm text-neutral-300 hover:bg-neutral-800 hover:text-white"
+                >
+                  Sign In
+                </Link>
+                <Link
+                  href="/pricing"
+                  onClick={() => setMobileOpen(false)}
+                  className="rounded-lg bg-brand-600 px-3 py-2.5 text-center text-sm font-semibold text-white hover:bg-brand-700"
+                >
+                  Get Started
+                </Link>
+              </>
+            )}
           </div>
         </div>
       )}

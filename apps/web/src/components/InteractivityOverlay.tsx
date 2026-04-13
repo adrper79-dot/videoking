@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { ChatPanel } from "./ChatPanel";
 import { PollWidget } from "./PollWidget";
 import { ReactionBar } from "./ReactionBar";
 import { WatchParty } from "./WatchParty";
 import { useWebSocket } from "@/hooks/useWebSocket";
-import type { ChatMessage, Poll, WSMessage } from "@nichestream/types";
+import { api } from "@/lib/api";
+import type { AuthEntitlements, ChatMessage, Poll, UserTier, WSMessage } from "@nichestream/types";
 import { cn } from "@/lib/utils";
 
 type Tab = "chat" | "polls" | "watch-party";
@@ -33,6 +34,31 @@ export function InteractivityOverlay({
   const [activePoll, setActivePoll] = useState<Poll | null>(null);
   const [reactionCounts, setReactionCounts] = useState<Record<string, number>>({});
   const [connectedCount, setConnectedCount] = useState(0);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [entitlements, setEntitlements] = useState<AuthEntitlements | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+
+    void api
+      .get<AuthEntitlements>("/api/auth/entitlements")
+      .then((data) => {
+        if (mounted) setEntitlements(data);
+      })
+      .catch(() => {
+        if (mounted) setEntitlements(null);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!notice) return;
+    const timeout = setTimeout(() => setNotice(null), 4000);
+    return () => clearTimeout(timeout);
+  }, [notice]);
 
   const handleMessage = useCallback((msg: WSMessage) => {
     switch (msg.type) {
@@ -76,6 +102,9 @@ export function InteractivityOverlay({
           setConnectedCount((msg.payload as { connectedCount: number }).connectedCount);
         }
         break;
+      case "error":
+        setNotice((msg.payload as { message?: string }).message ?? "Interaction unavailable");
+        break;
     }
   }, []);
 
@@ -93,6 +122,8 @@ export function InteractivityOverlay({
     { id: "watch-party", label: "Watch Party" },
   ];
 
+  const currentTier: UserTier = entitlements?.user?.effectiveTier ?? "free";
+
   return (
     <div className="flex h-[calc(100vh-6rem)] flex-col overflow-hidden rounded-xl border border-neutral-800 bg-neutral-900">
       {/* Header */}
@@ -108,8 +139,17 @@ export function InteractivityOverlay({
           <span className="text-sm text-neutral-400">
             {connectedCount > 0 ? `${connectedCount} watching` : "Connecting…"}
           </span>
+          <span className="rounded-full border border-neutral-700 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-neutral-300">
+            {currentTier}
+          </span>
         </div>
       </div>
+
+      {notice && (
+        <div className="border-b border-amber-500/30 bg-amber-500/10 px-4 py-2 text-xs text-amber-100">
+          {notice}
+        </div>
+      )}
 
       {/* Reaction bar */}
       <div className="border-b border-neutral-800 px-4 py-2">
@@ -146,6 +186,8 @@ export function InteractivityOverlay({
             messages={messages}
             onSend={(content) => sendMessage("chat_message", { content })}
             isConnected={isConnected}
+            currentTier={currentTier}
+            chatRateLimitMs={entitlements?.limits.chatRateLimitMs}
           />
         )}
         {activeTab === "polls" && (
@@ -155,6 +197,7 @@ export function InteractivityOverlay({
             onCreatePoll={(question, options) =>
               sendMessage("poll_create", { question, options })
             }
+            canCreatePoll={entitlements?.limits.canCreatePolls ?? false}
           />
         )}
         {activeTab === "watch-party" && (
@@ -162,6 +205,7 @@ export function InteractivityOverlay({
             onSync={(isPlaying, currentTimeSeconds) =>
               sendMessage("watch_party_sync", { isPlaying, currentTimeSeconds })
             }
+            canHost={entitlements?.limits.canUseWatchParty ?? false}
           />
         )}
       </div>

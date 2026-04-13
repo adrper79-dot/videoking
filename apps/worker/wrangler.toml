@@ -34,3 +34,19 @@ STREAM_ACCOUNT_ID = ""
 # Example: if your Stream URLs look like customer-abc123.cloudflarestream.com, set "abc123".
 STREAM_CUSTOMER_DOMAIN = ""
 PLATFORM_FEE_PERCENT = "20"
+STRIPE_CITIZEN_MONTHLY_PRICE = ""
+STRIPE_CITIZEN_ANNUAL_PRICE = ""
+STRIPE_VIP_MONTHLY_PRICE = ""
+CHAT_RATE_LIMIT_FREE_MS = "10000"
+CHAT_RATE_LIMIT_CITIZEN_MS = "1000"
+CHAT_RATE_LIMIT_VIP_MS = "500"
+TRIAL_PERIOD_DAYS = "14"
+# Public URL of the web frontend (used for Stripe and BetterAuth redirect URLs)
+# Set to your actual domain or override via wrangler secret for production
+APP_BASE_URL = "http://localhost:3000"
+
+# ─── Secrets (set via `wrangler secret put <NAME>`) ──────────────────────────
+# BETTER_AUTH_SECRET      — BetterAuth signing secret (required)
+# STRIPE_SECRET_KEY       — Stripe API secret key (required)
+# STRIPE_WEBHOOK_SECRET   — Stripe webhook signing secret (required)
+# STREAM_API_TOKEN        — Cloudflare Stream API token (required)

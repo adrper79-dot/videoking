@@ -5,10 +5,11 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:pages": "npx @cloudflare/next-on-pages",
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "deploy": "wrangler pages deploy .vercel/output/static"
+    "deploy": "pnpm build:pages && wrangler pages deploy .vercel/output/static"
   },
   "dependencies": {
     "@nichestream/types": "workspace:*",

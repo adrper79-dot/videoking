@@ -1,18 +1,25 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import type { Poll } from "@nichestream/types";
 
 interface PollWidgetProps {
   poll: Poll | null;
   onVote: (optionId: string) => void;
   onCreatePoll: (question: string, options: string[]) => void;
+  canCreatePoll: boolean;
 }
 
 /**
  * Displays an active poll with vote bars, or a creation form if none exists.
  */
-export function PollWidget({ poll, onVote, onCreatePoll }: PollWidgetProps) {
+export function PollWidget({
+  poll,
+  onVote,
+  onCreatePoll,
+  canCreatePoll,
+}: PollWidgetProps) {
   const [userVote, setUserVote] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [question, setQuestion] = useState("");
@@ -145,12 +152,23 @@ export function PollWidget({ poll, onVote, onCreatePoll }: PollWidgetProps) {
   return (
     <div className="flex flex-col items-center justify-center gap-4 p-8 text-center">
       <p className="text-neutral-400">No active poll.</p>
-      <button
-        onClick={() => setCreating(true)}
-        className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700"
-      >
-        Create a Poll
-      </button>
+      {canCreatePoll ? (
+        <button
+          onClick={() => setCreating(true)}
+          className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700"
+        >
+          Create a Poll
+        </button>
+      ) : (
+        <div className="space-y-2 rounded-xl border border-neutral-800 bg-neutral-900/60 p-4">
+          <p className="text-sm text-neutral-300">
+            Poll creation unlocks with Citizen so free viewers can participate without taking over the room.
+          </p>
+          <Link href="/pricing" className="text-sm font-medium text-brand-400 hover:underline">
+            Upgrade to unlock polls
+          </Link>
+        </div>
+      )}
     </div>
   );
 }

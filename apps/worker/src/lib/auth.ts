@@ -16,11 +16,15 @@ export function createAuth(db: DrizzleClient, env: Env) {
       provider: "pg",
       schema: {
         user: schema.users,
+        session: schema.sessions,
+        account: schema.accounts,
+        verification: schema.verifications,
       },
     }),
     emailAndPassword: {
       enabled: true,
       requireEmailVerification: false,
+      minPasswordLength: 8,
     },
     session: {
       expiresIn: 60 * 60 * 24 * 30, // 30 days
