@@ -5,11 +5,15 @@ import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import type { VideoUploadUrlResponse } from "@nichestream/types";
 
+const VIDEO_STYLES = ["digital", "traditional", "mixed_media", "3d"];
+const VIDEO_TOOLS = ["procreate", "clip_studio", "photoshop", "krita", "affinity", "blender", "maya", "traditional_media", "other"];
+const VIDEO_GENRES = ["animation", "comic", "illustration", "character_design", "concept_art", "afro_fantasy", "sci_fi", "animation_short", "process_video", "tutorial", "speedart", "other"];
+
 /**
  * Multi-step video upload form:
  * 1. Get a direct upload URL from Cloudflare Stream
  * 2. Upload the file directly to Stream (bypasses our Worker)
- * 3. PATCH the video record with title, description, visibility
+ * 3. PATCH the video record with title, description, visibility, and BlerdArt metadata
  */
 export function UploadForm() {
   const router = useRouter();
@@ -18,6 +22,10 @@ export function UploadForm() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [visibility, setVisibility] = useState<"public" | "subscribers_only" | "unlocked_only">("public");
+  const [style, setStyle] = useState("");
+  const [tool, setTool] = useState("");
+  const [genre, setGenre] = useState("");
+  const [tags, setTags] = useState("");
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
@@ -80,6 +88,11 @@ export function UploadForm() {
         description: description.trim() || undefined,
         visibility,
         status: "ready",
+        // BlerdArt metadata (optional)
+        ...(style && { style }),
+        ...(tool && { tool }),
+        ...(genre && { genre }),
+        ...(tags && { tags: tags.split(",").map((t) => t.trim()).filter(Boolean) }),
       });
 
       setStep("done");
@@ -216,6 +229,89 @@ export function UploadForm() {
               <option value="subscribers_only">Subscribers Only</option>
               <option value="unlocked_only">Pay-Per-View (Unlock)</option>
             </select>
+          </div>
+
+          {/* BlerdArt Metadata (Optional) */}
+          <div className="rounded-lg border border-neutral-700 bg-neutral-900 p-4">
+            <p className="mb-4 text-sm font-medium text-neutral-300">Creative Details (Optional)</p>
+            
+            <div className="space-y-4">
+              <div>
+                <label htmlFor="style" className="mb-1 block text-xs font-medium text-neutral-400">
+                  Art Style
+                </label>
+                <select
+                  id="style"
+                  value={style}
+                  onChange={(e) => setStyle(e.target.value)}
+                  disabled={step === "uploading"}
+                  className="w-full rounded-md border border-neutral-600 bg-neutral-800 px-3 py-2 text-sm text-white focus:border-brand-500 focus:outline-none disabled:opacity-50"
+                >
+                  <option value="">Select style</option>
+                  {VIDEO_STYLES.map((s) => (
+                    <option key={s} value={s}>
+                      {s.replace(/_/g, " ")}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label htmlFor="tool" className="mb-1 block text-xs font-medium text-neutral-400">
+                  Primary Tool
+                </label>
+                <select
+                  id="tool"
+                  value={tool}
+                  onChange={(e) => setTool(e.target.value)}
+                  disabled={step === "uploading"}
+                  className="w-full rounded-md border border-neutral-600 bg-neutral-800 px-3 py-2 text-sm text-white focus:border-brand-500 focus:outline-none disabled:opacity-50"
+                >
+                  <option value="">Select tool</option>
+                  {VIDEO_TOOLS.map((t) => (
+                    <option key={t} value={t}>
+                      {t.replace(/_/g, " ")}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label htmlFor="genre" className="mb-1 block text-xs font-medium text-neutral-400">
+                  Genre
+                </label>
+                <select
+                  id="genre"
+                  value={genre}
+                  onChange={(e) => setGenre(e.target.value)}
+                  disabled={step === "uploading"}
+                  className="w-full rounded-md border border-neutral-600 bg-neutral-800 px-3 py-2 text-sm text-white focus:border-brand-500 focus:outline-none disabled:opacity-50"
+                >
+                  <option value="">Select genre</option>
+                  {VIDEO_GENRES.map((g) => (
+                    <option key={g} value={g}>
+                      {g.replace(/_/g, " ")}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label htmlFor="tags" className="mb-1 block text-xs font-medium text-neutral-400">
+                  Tags (comma-separated)
+                </label>
+                <input
+                  id="tags"
+                  type="text"
+                  value={tags}
+                  onChange={(e) => setTags(e.target.value)}
+                  disabled={step === "uploading"}
+                  maxLength={200}
+                  placeholder="digital art, character design, tutorial"
+                  className="w-full rounded-md border border-neutral-600 bg-neutral-800 px-3 py-2 text-sm text-white placeholder-neutral-500 focus:border-brand-500 focus:outline-none disabled:opacity-50"
+                />
+              </div>
+            </div>
           </div>
 
           <button
