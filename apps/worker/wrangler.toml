@@ -22,7 +22,7 @@ id = "72697ebbf0d44419850743679390acf1"
 
 [[r2_buckets]]
 binding = "R2_BUCKET"
-bucket_name = "nichestream-assets"
+bucket_name = "videoking-r2"
 
 [vars]
 # Your Cloudflare account ID (found in the dashboard top-right or via `wrangler whoami`)
