@@ -44,7 +44,7 @@ webhooksRouter.post("/stripe", async (c) => {
       case "customer.subscription.created":
       case "customer.subscription.updated": {
         const sub = event.data.object as Stripe.Subscription;
-        await handleSubscriptionUpdated(db, stripe, sub);
+        await handleSubscriptionUpdated(db, stripe, sub, platformFeePercent);
         break;
       }
 
@@ -125,6 +125,7 @@ async function handleSubscriptionUpdated(
   db: ReturnType<typeof createDb>,
   stripe: Stripe,
   sub: Stripe.Subscription,
+  platformFeePercent: number,
 ): Promise<void> {
   const { subscriberId, creatorId, plan } = sub.metadata ?? {};
 
@@ -163,7 +164,6 @@ async function handleSubscriptionUpdated(
 
   // If newly active, record a subscription_share earning for creator
   if (status === "active") {
-    const platformFeePercent = 20;
     const grossAmountCents =
       (sub.items.data[0]?.price.unit_amount ?? 0) * (sub.items.data[0]?.quantity ?? 1);
 

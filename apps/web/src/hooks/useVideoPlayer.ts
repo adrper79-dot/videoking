@@ -41,19 +41,33 @@ export function useVideoPlayer({ iframeRef }: UseVideoPlayerOptions): UseVideoPl
     buffered: 0,
   });
 
-  // Cloudflare Stream uses a per-account customer subdomain for postMessage.
-  // We validate event.origin in the message handler to guard against spoofing.
-  const playerOrigin = "*"; // origin checked below via event.origin validation
+  /**
+   * Derive the target origin for postMessage from the iframe's current src.
+   * Falls back to the standard Cloudflare Stream iframe delivery domain.
+   * Using a specific origin (instead of '*') prevents message injection from
+   * unrelated cross-origin frames.
+   */
+  const getPlayerOrigin = useCallback((): string => {
+    const src = iframeRef.current?.src;
+    if (src) {
+      try {
+        return new URL(src).origin;
+      } catch {
+        // Fall through to default
+      }
+    }
+    return "https://iframe.videodelivery.net";
+  }, [iframeRef]);
 
   /** Send a command to the Stream player via postMessage. */
   const sendCommand = useCallback(
     (method: string, value?: unknown) => {
       iframeRef.current?.contentWindow?.postMessage(
         { method, value },
-        playerOrigin,
+        getPlayerOrigin(),
       );
     },
-    [iframeRef, playerOrigin],
+    [iframeRef, getPlayerOrigin],
   );
 
   // Listen for events from the Stream player
