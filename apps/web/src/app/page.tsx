@@ -4,7 +4,7 @@ import type { PaginatedResponse, Video } from "@nichestream/types";
 
 export const revalidate = 60;
 
-/** Home page – renders the main public video feed. Updated with new API credentials. */
+/** Home page – renders the main public video feed. Deployment update. */
 export default async function HomePage() {
   let initialData: PaginatedResponse<Video> | null = null;
 
