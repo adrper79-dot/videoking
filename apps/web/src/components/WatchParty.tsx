@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useVideoPlayback } from "./VideoPlaybackContext";
 
 interface WatchPartyProps {
   onSync: (isPlaying: boolean, currentTimeSeconds: number) => void;
@@ -15,6 +16,7 @@ interface WatchPartyProps {
 export function WatchParty({ onSync, canHost }: WatchPartyProps) {
   const [isHost, setIsHost] = useState(false);
   const [syncTime, setSyncTime] = useState("");
+  const { currentTime } = useVideoPlayback();
 
   function handleBecomeHost() {
     if (!canHost) return;
@@ -22,11 +24,12 @@ export function WatchParty({ onSync, canHost }: WatchPartyProps) {
   }
 
   function handlePlay() {
-    onSync(true, 0);
+    // Sync from the actual current playback time, not hardcoded 0
+    onSync(true, currentTime);
   }
 
   function handlePause() {
-    onSync(false, 0);
+    onSync(false, currentTime);
   }
 
   function handleSeek(e: React.FormEvent) {

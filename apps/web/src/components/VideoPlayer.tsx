@@ -1,7 +1,8 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, useEffect } from "react";
 import { useVideoPlayer } from "@/hooks/useVideoPlayer";
+import { useVideoPlayback } from "./VideoPlaybackContext";
 import { cn } from "@/lib/utils";
 
 interface VideoPlayerProps {
@@ -28,6 +29,13 @@ export function VideoPlayer({
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const { isPlaying, currentTime, duration, volume, isMuted, play, pause, seek, setVolume, toggleMute, toggleFullscreen } =
     useVideoPlayer({ iframeRef });
+  
+  const { setCurrentTime } = useVideoPlayback();
+  
+  // Broadcast current playback time to context for watch party sync
+  useEffect(() => {
+    setCurrentTime(currentTime);
+  }, [currentTime, setCurrentTime]);
 
   const streamDomain = customerSubdomain
     ? `customer-${customerSubdomain}.cloudflarestream.com`

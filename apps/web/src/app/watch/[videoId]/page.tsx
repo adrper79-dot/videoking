@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { VideoPlayer } from "@/components/VideoPlayer";
+import { VideoPlaybackProvider } from "@/components/VideoPlaybackContext";
 import { InteractivityOverlay } from "@/components/InteractivityOverlay";
 import { api } from "@/lib/api";
 import type { Video } from "@nichestream/types";
@@ -49,14 +50,16 @@ export default async function WatchPage({ params }: WatchPageProps) {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_360px]">
         {/* Main content */}
         <div className="space-y-4">
-          <VideoPlayer
-            streamVideoId={video.cloudflareStreamId}
-            title={video.title}
-            playbackUrl={video.playbackUrl ?? undefined}
-          />
+          <VideoPlaybackProvider>
+            <VideoPlayer
+              streamVideoId={video.cloudflareStreamId}
+              title={video.title}
+              playbackUrl={video.playbackUrl ?? undefined}
+            />
+          </VideoPlaybackProvider>
 
           <div className="rounded-xl border border-neutral-800 bg-neutral-900 p-5">
-            <h1 className="text-xl font-bold text-white">{video.title}</h1>
+            <h1 className="text xl font-bold text-white">{video.title}</h1>
             <div className="mt-2 flex items-center gap-4 text-sm text-neutral-400">
               <span>{video.viewsCount.toLocaleString()} views</span>
               <span>{video.likesCount.toLocaleString()} likes</span>
@@ -79,7 +82,9 @@ export default async function WatchPage({ params }: WatchPageProps) {
         </div>
 
         {/* Interactivity sidebar */}
-        <InteractivityOverlay videoId={videoId} />
+        <VideoPlaybackProvider>
+          <InteractivityOverlay videoId={videoId} />
+        </VideoPlaybackProvider>
       </div>
     </div>
   );

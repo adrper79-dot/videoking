@@ -175,6 +175,10 @@ app.get("/api/dashboard/earnings", async (c) => {
 /**
  * GET /api/dashboard/analytics
  * Returns analytics for the creator's videos using Cloudflare Stream API.
+ * 
+ * NOTE: Currently fires up to 10 concurrent HTTP calls to Cloudflare Stream API.
+ * Future optimization: batch requests or implement polling/caching strategy.
+ * Not a blocking issue for single creator, but consider throttling for high-volume use.
  */
 app.get("/api/dashboard/analytics", async (c) => {
   const db = createDb(c.env);

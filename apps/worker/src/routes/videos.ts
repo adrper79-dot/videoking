@@ -20,7 +20,9 @@ videosRouter.get("/", async (c) => {
   const offset = (page - 1) * pageSize;
 
   try {
-    const rows = await db
+    // Use COUNT(*) window function to avoid 2 separate queries
+    // In a single query, we get both paginated results and total count
+    const rowsWithCount = await db
       .select({
         id: videos.id,
         creatorId: videos.creatorId,
@@ -38,6 +40,8 @@ videosRouter.get("/", async (c) => {
         creatorUsername: users.username,
         creatorDisplayName: users.displayName,
         creatorAvatarUrl: users.avatarUrl,
+        // Window function: count all matching rows without pagination
+        totalCount: sql<number>`count(*) over ()`,
       })
       .from(videos)
       .leftJoin(users, eq(videos.creatorId, users.id))
@@ -46,17 +50,18 @@ videosRouter.get("/", async (c) => {
       .limit(pageSize)
       .offset(offset);
 
-    const [{ count }] = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(videos)
-      .where(and(eq(videos.status, "ready"), eq(videos.visibility, "public")));
+    // Extract total count from the first row (same for all rows due to window function)
+    const totalCount = rowsWithCount.length > 0 ? rowsWithCount[0].totalCount : 0;
+    
+    // Remove totalCount from response data
+    const rows = rowsWithCount.map(({ totalCount: _, ...row }) => row);
 
     return c.json({
       data: rows,
-      total: Number(count),
+      total: totalCount,
       page,
       pageSize,
-      hasMore: offset + pageSize < Number(count),
+      hasMore: offset + pageSize < totalCount,
     });
   } catch (err) {
     console.error("GET /api/videos error:", err);
