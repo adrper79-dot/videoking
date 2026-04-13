@@ -1,34 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
+import { useState } from "react";
 import { cn } from "@/lib/utils";
-import type { AuthEntitlements } from "@nichestream/types";
+import { useEntitlements } from "./EntitlementsContext";
 
 /**
  * Top navigation bar with logo, main links, and mobile menu.
  */
 export function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [entitlements, setEntitlements] = useState<AuthEntitlements | null>(null);
-
-  useEffect(() => {
-    let mounted = true;
-
-    void api
-      .get<AuthEntitlements>("/api/auth/entitlements")
-      .then((data) => {
-        if (mounted) setEntitlements(data);
-      })
-      .catch(() => {
-        if (mounted) setEntitlements(null);
-      });
-
-    return () => {
-      mounted = false;
-    };
-  }, []);
+  const { entitlements } = useEntitlements();
 
   const navLinks = [
     { href: "/", label: "Home" },

@@ -2,9 +2,7 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
-import type { AuthEntitlements } from "@nichestream/types";
-import { api } from "@/lib/api";
+import { useEntitlements } from "./EntitlementsContext";
 
 function getTrialDaysLeft(trialEndsAt: string | null | undefined): number | null {
   if (!trialEndsAt) return null;
@@ -14,23 +12,7 @@ function getTrialDaysLeft(trialEndsAt: string | null | undefined): number | null
 
 export function PricingClient() {
   const searchParams = useSearchParams();
-  const [entitlements, setEntitlements] = useState<AuthEntitlements | null>(null);
-
-  useEffect(() => {
-    let mounted = true;
-    void api
-      .get<AuthEntitlements>("/api/auth/entitlements")
-      .then((data) => {
-        if (mounted) setEntitlements(data);
-      })
-      .catch(() => {
-        if (mounted) setEntitlements(null);
-      });
-
-    return () => {
-      mounted = false;
-    };
-  }, []);
+  const { entitlements } = useEntitlements();
 
   const welcome = searchParams.get("welcome") === "1";
   const trialDaysLeft = getTrialDaysLeft(entitlements?.user?.trialEndsAt);

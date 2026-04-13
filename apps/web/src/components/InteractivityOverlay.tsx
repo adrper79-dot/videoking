@@ -6,53 +6,33 @@ import { PollWidget } from "./PollWidget";
 import { ReactionBar } from "./ReactionBar";
 import { WatchParty } from "./WatchParty";
 import { useWebSocket } from "@/hooks/useWebSocket";
-import { api } from "@/lib/api";
-import type { AuthEntitlements, ChatMessage, Poll, UserTier, WSMessage } from "@nichestream/types";
+import type { ChatMessage, Poll, UserTier, WSMessage } from "@nichestream/types";
+import { useEntitlements } from "./EntitlementsContext";
 import { cn } from "@/lib/utils";
 
 type Tab = "chat" | "polls" | "watch-party";
 
 interface InteractivityOverlayProps {
   videoId: string;
-  userId?: string;
-  username?: string;
-  avatarUrl?: string | null;
 }
 
 /**
  * Side panel combining Chat, Polls, Reactions, and Watch Party controls.
  * Connects to the VideoRoom Durable Object via WebSocket.
+ * Gets user identity from EntitlementsContext.
  */
-export function InteractivityOverlay({
-  videoId,
-  userId,
-  username,
-  avatarUrl,
-}: InteractivityOverlayProps) {
+export function InteractivityOverlay({ videoId }: InteractivityOverlayProps) {
   const [activeTab, setActiveTab] = useState<Tab>("chat");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [activePoll, setActivePoll] = useState<Poll | null>(null);
   const [reactionCounts, setReactionCounts] = useState<Record<string, number>>({});
   const [connectedCount, setConnectedCount] = useState(0);
   const [notice, setNotice] = useState<string | null>(null);
-  const [entitlements, setEntitlements] = useState<AuthEntitlements | null>(null);
+  const { entitlements } = useEntitlements();
 
-  useEffect(() => {
-    let mounted = true;
-
-    void api
-      .get<AuthEntitlements>("/api/auth/entitlements")
-      .then((data) => {
-        if (mounted) setEntitlements(data);
-      })
-      .catch(() => {
-        if (mounted) setEntitlements(null);
-      });
-
-    return () => {
-      mounted = false;
-    };
-  }, []);
+  const userId = entitlements?.user?.id;
+  const username = entitlements?.user?.username ?? "Guest";
+  const avatarUrl = entitlements?.user?.avatarUrl ?? null;
 
   useEffect(() => {
     if (!notice) return;

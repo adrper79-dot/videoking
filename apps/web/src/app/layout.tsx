@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { Navbar } from "@/components/Navbar";
+import { EntitlementsProvider } from "@/components/EntitlementsContext";
 
 export const metadata: Metadata = {
   title: {
@@ -36,8 +37,10 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body className="min-h-screen bg-[#0f0f0f] text-neutral-100 antialiased">
-        <Navbar />
-        <main className="pt-16">{children}</main>
+        <EntitlementsProvider>
+          <Navbar />
+          <main className="pt-16">{children}</main>
+        </EntitlementsProvider>
       </body>
     </html>
   );
