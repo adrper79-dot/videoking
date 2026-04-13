@@ -26,6 +26,8 @@ export function UploadForm() {
   const [tool, setTool] = useState("");
   const [genre, setGenre] = useState("");
   const [tags, setTags] = useState("");
+  const [humanCreatedAffirmed, setHumanCreatedAffirmed] = useState(true);
+  const [watermarkEnabled, setWatermarkEnabled] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
@@ -93,6 +95,9 @@ export function UploadForm() {
         ...(tool && { tool }),
         ...(genre && { genre }),
         ...(tags && { tags: tags.split(",").map((t) => t.trim()).filter(Boolean) }),
+        // Creator affirmation and watermark
+        humanCreatedAffirmed,
+        watermarkEnabled,
       });
 
       setStep("done");
@@ -314,9 +319,44 @@ export function UploadForm() {
             </div>
           </div>
 
+          {/* Creator Affirmation & Watermark */}
+          <div className="space-y-3">
+            <label className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                checked={humanCreatedAffirmed}
+                onChange={(e) => setHumanCreatedAffirmed(e.target.checked)}
+                disabled={step === "uploading"}
+                className="h-4 w-4 rounded border-neutral-600 bg-neutral-800 accent-brand-500 disabled:opacity-50"
+              />
+              <span className="text-sm text-neutral-300">
+                I affirm this video is human-created
+                <span className="block text-xs text-neutral-500">
+                  Help combat AI art and IP theft. AI creations must be labeled as such.
+                </span>
+              </span>
+            </label>
+
+            <label className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                checked={watermarkEnabled}
+                onChange={(e) => setWatermarkEnabled(e.target.checked)}
+                disabled={step === "uploading"}
+                className="h-4 w-4 rounded border-neutral-600 bg-neutral-800 accent-brand-500 disabled:opacity-50"
+              />
+              <span className="text-sm text-neutral-300">
+                Add BlerdArt watermark
+                <span className="block text-xs text-neutral-500">
+                  Visible watermark protects your artwork from unauthorized use.
+                </span>
+              </span>
+            </label>
+          </div>
+
           <button
             type="submit"
-            disabled={step === "uploading" || !title.trim()}
+            disabled={step === "uploading" || !title.trim() || !humanCreatedAffirmed}
             className="w-full rounded-lg bg-brand-600 px-4 py-3 font-semibold text-white transition hover:bg-brand-700 disabled:opacity-50"
           >
             {step === "uploading" ? "Uploading…" : "Upload Video"}
