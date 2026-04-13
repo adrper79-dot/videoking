@@ -7,6 +7,9 @@ export * from "./interactions";
 export * from "./playlists";
 export * from "./moderation";
 export * from "./auth";
+// Phase 2: BlerdArt niche features
+export * from "./events";
+export * from "./assets";
 
 // ─── Drizzle Relations (defined here to avoid circular imports) ───────────────
 import { relations } from "drizzle-orm";

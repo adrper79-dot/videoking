@@ -29,5 +29,7 @@ export const users = pgTable("users", {
   website: text("website"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  // Phase 2: BlerdArt niche features
+  blerdartVerified: boolean("blerdart_verified").notNull().default(false),
 });
 
