@@ -52,6 +52,13 @@ export function VideoCard({ video }: VideoCardProps) {
               LIVE
             </span>
           )}
+
+          {/* Human-Created badge */}
+          {video.humanCreatedAffirmed && (
+            <span className="absolute left-2 top-12 flex items-center gap-1 rounded bg-blue-600 px-1.5 py-0.5 text-xs font-medium text-white">
+              ✓ Human-Created
+            </span>
+          )}
         </div>
       </Link>
 

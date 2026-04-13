@@ -54,6 +54,14 @@ export interface Video {
   /** Cloudflare Stream customer subdomain for constructing embed URLs */
   streamCustomerDomain?: string;
   creator?: PublicUser;
+  // Phase 2: BlerdArt features
+  style?: string;
+  tool?: string;
+  genre?: string;
+  tags?: string[];
+  eventId?: string;
+  humanCreatedAffirmed?: boolean;
+  watermarkEnabled?: boolean;
 }
 
 export interface VideoUploadUrlResponse {
