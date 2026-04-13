@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import type { Env } from "../types";
 import { createDb } from "../lib/db";
 import { createStripeClient, verifyStripeWebhook, calculateFees } from "../lib/stripe";
-import { subscriptions, earnings, videoUnlocks, connectedAccounts } from "@nichestream/db";
+import { subscriptions, earnings, videoUnlocks } from "@nichestream/db";
 import { eq } from "drizzle-orm";
 import type Stripe from "stripe";
 
@@ -183,9 +183,6 @@ async function handleSubscriptionUpdated(
       });
     }
   }
-
-  void stripe;
-  void connectedAccounts;
 }
 
 export { webhooksRouter as webhookRoutes };

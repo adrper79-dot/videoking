@@ -330,12 +330,7 @@ export class VideoRoom {
     const validOption = this.activePoll.options.some((o) => o.id === optionId);
     if (!validOption) return;
 
-    // Prevent double voting (tracked by userId in the votes map)
-    const hasVoted = Object.values(this.activePoll.votes).some(
-      (_, key) => key === session.userId,
-    );
-
-    // Use a separate voter registry
+    // Use DO storage to track voters and prevent double-voting
     const voterKey = `poll_voter_${this.activePoll.id}_${session.userId}`;
     const alreadyVoted = await this.state.storage.get<boolean>(voterKey);
     if (alreadyVoted) return;
@@ -354,8 +349,6 @@ export class VideoRoom {
       },
       timestamp: new Date().toISOString(),
     });
-
-    void hasVoted; // suppress unused warning
   }
 
   /** Handle watch party sync events (play/pause/seek from host). */

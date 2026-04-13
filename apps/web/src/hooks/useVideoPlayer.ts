@@ -41,7 +41,9 @@ export function useVideoPlayer({ iframeRef }: UseVideoPlayerOptions): UseVideoPl
     buffered: 0,
   });
 
-  const playerOrigin = "https://customer-*.cloudflarestream.com";
+  // Cloudflare Stream uses a customer-subdomain origin for postMessage
+  // We use "*" to accept messages from any Stream origin (all share the same API)
+  const playerOrigin = "*";
 
   /** Send a command to the Stream player via postMessage. */
   const sendCommand = useCallback(

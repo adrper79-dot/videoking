@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { authClient } from "@/lib/auth-client";
 
 export const metadata: Metadata = { title: "Sign In" };
 
@@ -28,7 +27,6 @@ export default function SignInPage() {
 
 /** Client component form – must be a separate "use client" component. */
 function SignInForm() {
-  void authClient;
   return (
     <form
       action="/api/auth/sign-in/email"

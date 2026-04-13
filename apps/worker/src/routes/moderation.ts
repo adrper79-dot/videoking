@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { eq, desc, sql, and, gte } from "drizzle-orm";
+import { eq, desc, and, gte } from "drizzle-orm";
 import type { Env } from "../types";
 import { createDb } from "../lib/db";
 import { createAuth } from "../lib/auth";
@@ -203,9 +203,6 @@ moderationRouter.get("/dashboard/earnings", async (c) => {
     console.error("GET /api/dashboard/earnings error:", err);
     return c.json({ error: "InternalError", message: "Failed to fetch earnings" }, 500);
   }
-
-  void sql;
-  void gte;
 });
 
 export { moderationRouter as moderationRoutes };
