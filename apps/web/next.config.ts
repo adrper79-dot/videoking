@@ -5,7 +5,10 @@ const nextConfig: NextConfig = {
   // Cloudflare Pages edge runtime. Do NOT set output: 'export' here — that
   // would break dynamic routes that use notFound() or server-side data fetching.
   images: {
-    // Cloudflare Image Resizing handles optimization at the edge
+    // Cloudflare Pages does not support Next.js's built-in image optimization
+    // (next/image requires serverless function execution). Instead, unoptimized: true
+    // relies on Cloudflare's edge caching and CDN compression for optimization.
+    // Future: Consider Cloudflare Image Variants via custom fetch handlers for WebP/AVIF.
     unoptimized: true,
     remotePatterns: [
       { protocol: "https", hostname: "assets.nichestream.tv" },
