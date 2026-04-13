@@ -1,0 +1,28 @@
+name = "nichestream-api"
+main = "src/index.ts"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+
+[[durable_objects.bindings]]
+name = "VIDEO_ROOM"
+class_name = "VideoRoom"
+
+[[durable_objects.bindings]]
+name = "USER_PRESENCE"
+class_name = "UserPresence"
+
+[[migrations]]
+tag = "v1"
+new_classes = ["VideoRoom", "UserPresence"]
+
+[[hyperdrive]]
+binding = "DB"
+id = "YOUR_HYPERDRIVE_ID"
+
+[[r2_buckets]]
+binding = "R2_BUCKET"
+bucket_name = "nichestream-assets"
+
+[vars]
+STREAM_ACCOUNT_ID = ""
+PLATFORM_FEE_PERCENT = "20"
