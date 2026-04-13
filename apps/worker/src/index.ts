@@ -100,6 +100,7 @@ app.route("/api/events", eventsRouter);
 // ─── Assets Routes ────────────────────────────────────────────────────────────
 
 app.route("/api/assets", assetsRouter);
+
 // ─── WebSocket: upgrade to VideoRoom Durable Object ──────────────────────────
 
 /**
