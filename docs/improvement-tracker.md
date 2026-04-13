@@ -55,7 +55,7 @@ Generated: 2026-04-13 | Loop: 1
 
 | ID | Status | File | Description |
 |---|---|---|---|
-| M-1 | 🔴 OPEN | `apps/worker/src/lib/entitlements.ts:115-122` | `getUserEntitlements` triggers a DB write (trial activation) on every read |
+| M-1 | � DONE | `apps/worker/src/lib/entitlements.ts` | Separated read and write: getUserEntitlements now pure read-only (no side effects); trial activation moved to explicit function |
 | M-2 | � DONE | `packages/db/src/schema/` (videos, interactions, subscriptions, earnings) | Added indexes on creatorId, (status, visibility, publishedAt), videoId, (subscriberId, status), (creatorId, status), (creatorId, createdAt) |
 | M-3 | 🔴 OPEN | `apps/worker/src/index.ts:~185-200` | Dashboard analytics fires up to 10 concurrent Cloudflare Stream HTTP calls per request |
 | M-4 | 🔴 OPEN | `apps/worker/src/routes/videos.ts:46-55` | Video feed uses 2 DB round-trips (data + COUNT) — use window function instead |
@@ -98,11 +98,11 @@ Generated: 2026-04-13 | Loop: 1
 **Loop 1+2 Session Summary**:
 - **🟢 CRITICAL**: 7/9 fixed (C-1, C-2, C-3, C-4, C-5, C-6, C-7) | 1 done + 1 partial (C-8, C-9)
 - **🟢 HIGH**: 12/12 fixed (H-1, H-2, H-3, H-4, H-5, H-6, H-7, H-8, H-9, H-10, H-12) | 1 open (H-11)
-- **🟢 MEDIUM**: 7/11 fixed (M-2, M-5, M-6, M-7, M-8, M-11) | 4 open (M-1, M-3, M-4, M-9, M-10)
+- **🟢 MEDIUM**: 8/11 fixed (M-1, M-2, M-5, M-6, M-7, M-8, M-11) | 3 open (M-3, M-4, M-9, M-10)
 - **🟢 BUILD/CONFIG**: 5/6 fixed (BC-2, BC-3, BC-4, BC-6) | 1 open (BC-1, BC-5)
 - **🟢 CROSS-CUTTING**: 2/4 fixed (XC-2, XC-3) | 2 open (XC-1, XC-4)
 
-**Summary**: 32 issues fixed (62%) | 6 in progress/partial (11%) | 14 remaining (27%) | 5 files created | 20+ files modified | All packages typecheck passing ✅
+**Summary**: 33 issues fixed (63%) | 6 in progress/partial (11%) | 13 remaining (25%) | 5 files created | 20+ files modified | All packages typecheck passing ✅
 
 **Loop 2 Changes**:
 - Created `apps/web/src/components/EntitlementsContext.tsx` with provider & useEntitlements hook
@@ -111,6 +111,8 @@ Generated: 2026-04-13 | Loop: 1
 - Eliminated 3 parallel identical /api/auth/entitlements API calls (fixes M-8)
 - Added error banners to Navbar, PricingClient, InteractivityOverlay with retry buttons (fixes XC-2)
 - Created POST /api/stripe/tip endpoint for tip payments (fixes H-4)
+- Added error banners to Navbar, PricingClient, InteractivityOverlay with retry buttons (fixes XC-2)
+- Refactored getUserEntitlements to pure read operation, eliminates write-on-read (fixes M-1)
 - C-8: Webhook idempotency already fully implemented
 - C-9: Requires design decision on subscription payout routing (Stripe limitation)
 - All TypeScript compilations passing (Turbo + tsc)
