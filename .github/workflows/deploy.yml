@@ -56,6 +56,10 @@ jobs:
           HYPERDRIVE_ID: ${{ secrets.HYPERDRIVE_ID }}
         run: |
           cd apps/worker
+          # Substitute HYPERDRIVE_ID in wrangler.toml if it's provided
+          if [ -n "$HYPERDRIVE_ID" ]; then
+            sed -i "s/YOUR_HYPERDRIVE_ID/$HYPERDRIVE_ID/g" wrangler.toml
+          fi
           pnpm exec wrangler deploy
 
       - name: Deploy Pages to Cloudflare
