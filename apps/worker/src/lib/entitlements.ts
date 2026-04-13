@@ -112,12 +112,16 @@ export async function activateTrialIfEligible(
   return updated ?? existing;
 }
 
+/**
+ * Pure read: get current entitlements without side effects.
+ * Trial activation is a write operation - handle separately in signup flow or dedicated endpoint.
+ */
 export async function getUserEntitlements(
   db: DrizzleClient,
   userId: string,
   env: Env,
 ): Promise<AuthEntitlements | null> {
-  const user = await activateTrialIfEligible(db, userId, env);
+  const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
   if (!user) return null;
   return buildAuthEntitlements(user, env);
 }
