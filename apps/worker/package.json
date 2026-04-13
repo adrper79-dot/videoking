@@ -12,13 +12,13 @@
   "dependencies": {
     "@nichestream/db": "workspace:*",
     "@nichestream/types": "workspace:*",
-    "drizzle-orm": "^0.30.0",
+    "drizzle-orm": "^0.45.2",
     "hono": "^4.3.0",
     "stripe": "^15.0.0"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20240512.0",
-    "drizzle-kit": "^0.21.0",
+    "drizzle-kit": "^0.30.0",
     "typescript": "^5.4.0",
     "wrangler": "^3.57.0"
   }
