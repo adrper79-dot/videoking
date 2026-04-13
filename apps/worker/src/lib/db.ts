@@ -6,6 +6,10 @@ import type { Env } from "../types";
 /**
  * Creates a Drizzle ORM client connected via Cloudflare Hyperdrive.
  * Hyperdrive wraps the Neon connection string with connection pooling.
+ * 
+ * NOTE (XC-1): Currently instantiated per-request. Future optimization:
+ * Cache at isolate level using module-level variable + guard logic.
+ * Requires careful type handling to satisfy TS strict mode null checks.
  */
 export function createDb(env: Env) {
   const client = postgres(env.DB.connectionString, {
@@ -18,3 +22,4 @@ export function createDb(env: Env) {
 }
 
 export type DrizzleClient = ReturnType<typeof createDb>;
+

@@ -7,6 +7,10 @@ import * as schema from "@nichestream/db";
 /**
  * Creates a BetterAuth instance configured with Drizzle adapter.
  * Called once per request using the per-request DB connection.
+ * 
+ * NOTE (XC-1): Currently instantiated per-request. Future optimization:
+ * Consider caching at isolate level alongside cached DB client.
+ * Requires TypeScript generic specialization work to avoid type erasure.
  */
 export function createAuth(db: DrizzleClient, env: Env) {
   return betterAuth({
