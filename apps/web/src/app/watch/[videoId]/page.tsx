@@ -6,6 +6,8 @@ import { InteractivityOverlay } from "@/components/InteractivityOverlay";
 import { api } from "@/lib/api";
 import type { Video } from "@nichestream/types";
 
+export const runtime = "edge";
+
 interface WatchPageProps {
   params: Promise<{ videoId: string }>;
 }

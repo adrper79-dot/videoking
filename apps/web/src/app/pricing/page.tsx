@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { PricingClient } from "@/components/PricingClient";
 
 export const dynamic = "force-dynamic";
+export const runtime = "edge";
 export const metadata: Metadata = {
   title: "Pricing",
   description: "Compare Free, Citizen, and VIP tiers for NicheStream.",

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { SignInForm } from "./SignInForm";
 
 export const dynamic = "force-dynamic";
+export const runtime = "edge";
 export const metadata: Metadata = { title: "Sign In" };
 
 export default function SignInPage() {

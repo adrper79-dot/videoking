@@ -6,6 +6,8 @@ import { SubscribeButton } from "@/components/SubscribeButton";
 import { api } from "@/lib/api";
 import type { PublicUser, Video } from "@nichestream/types";
 
+export const runtime = "edge";
+
 interface ChannelPageProps {
   params: Promise<{ username: string }>;
 }

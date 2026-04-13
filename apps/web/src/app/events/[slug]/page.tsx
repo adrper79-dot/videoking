@@ -7,6 +7,8 @@ import { api } from '@/lib/api';
 import { VideoCard } from '@/components/VideoCard';
 import type { Video } from '@nichestream/types';
 
+export const runtime = 'edge';
+
 interface Event {
   id: string;
   name: string;
