@@ -1,13 +1,12 @@
 import { createAuthClient } from "better-auth/react";
 
-const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8787";
-
 /**
- * BetterAuth client — wraps fetch calls to the Worker's /api/auth/* endpoints.
- * Use `authClient.signIn`, `authClient.signUp`, `authClient.useSession`, etc.
+ * BetterAuth client — routes auth requests through Next.js proxy at /api/auth/*
+ * which forwards to the Worker's actual auth endpoints.
+ * This ensures cookies and other auth context work correctly in both dev and prod.
  */
 export const authClient = createAuthClient({
-  baseURL: apiUrl,
+  baseURL: "/api/auth", // Use Next.js proxy, not direct Worker URL
 });
 
 export type Session = typeof authClient.$Infer.Session;
