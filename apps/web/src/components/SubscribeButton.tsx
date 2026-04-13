@@ -21,13 +21,14 @@ export function SubscribeButton({ creatorId, creatorUsername }: SubscribeButtonP
     setError(null);
 
     try {
-      // In production this priceId would come from the creator's Stripe configuration
-      const MONTHLY_PRICE_ID = "price_placeholder_monthly";
+      // priceId is configured via NEXT_PUBLIC_SUBSCRIPTION_PRICE_MONTHLY env variable.
+      // Set this in your .env.local / Cloudflare Pages environment variables.
+      const priceId = process.env.NEXT_PUBLIC_SUBSCRIPTION_PRICE_MONTHLY ?? "";
 
       const data = await api.post<SubscriptionCheckoutResponse>("/api/stripe/subscriptions", {
         creatorId,
         plan: "monthly",
-        priceId: MONTHLY_PRICE_ID,
+        priceId,
       });
 
       if (data.checkoutUrl) {

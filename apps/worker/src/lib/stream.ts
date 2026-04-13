@@ -113,7 +113,7 @@ export async function getSignedStreamUrl(
   }
 
   const data = (await res.json()) as { result: { token: string }; success: boolean };
-  return `https://customer-${env.STREAM_ACCOUNT_ID}.cloudflarestream.com/${data.result.token}/iframe`;
+  return `https://customer-${env.STREAM_CUSTOMER_DOMAIN}.cloudflarestream.com/${data.result.token}/iframe`;
 }
 
 /**

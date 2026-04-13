@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 import type { Env } from "../types";
 import { createDb } from "../lib/db";
 import { createAuth } from "../lib/auth";
@@ -78,12 +78,15 @@ channelsRouter.get("/:username/subscription-status", async (c) => {
       .select()
       .from(subscriptions)
       .where(
-        eq(subscriptions.subscriberId, session.user.id),
+        and(
+          eq(subscriptions.subscriberId, session.user.id),
+          eq(subscriptions.creatorId, creator.id),
+        ),
       )
       .limit(1);
 
     return c.json({
-      subscribed: !!sub && sub.status === "active" && sub.creatorId === creator.id,
+      subscribed: !!sub && sub.status === "active",
       subscription: sub ?? null,
     });
   } catch (err) {

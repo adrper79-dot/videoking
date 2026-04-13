@@ -71,6 +71,10 @@ pnpm install
 ```
 BETTER_AUTH_SECRET=your-secret-here
 STREAM_API_TOKEN=your-stream-token
+STREAM_ACCOUNT_ID=your-cf-account-id
+# Stream customer subdomain (Settings → Customer Domain in Cloudflare Stream dashboard)
+# e.g. if your URLs are customer-abc123.cloudflarestream.com, set STREAM_CUSTOMER_DOMAIN=abc123
+STREAM_CUSTOMER_DOMAIN=abc123
 STRIPE_SECRET_KEY=sk_test_...
 STRIPE_WEBHOOK_SECRET=whsec_...
 APP_BASE_URL=http://localhost:3000
@@ -81,6 +85,8 @@ PLATFORM_FEE_PERCENT=20
 ```
 NEXT_PUBLIC_API_URL=http://localhost:8787
 NEXT_PUBLIC_APP_URL=http://localhost:3000
+# Stripe Price ID for the monthly subscription plan (create in Stripe dashboard)
+NEXT_PUBLIC_SUBSCRIPTION_PRICE_MONTHLY=price_...
 ```
 
 ### 3. Set up the database
@@ -92,7 +98,10 @@ DATABASE_URL=postgres://... pnpm db:migrate
 
 ### 4. Update wrangler.toml
 
-Edit `apps/worker/wrangler.toml` and replace `YOUR_HYPERDRIVE_ID` with your actual Hyperdrive binding ID.
+Edit `apps/worker/wrangler.toml` and replace:
+- `YOUR_HYPERDRIVE_ID` with your actual Hyperdrive binding ID (Cloudflare dashboard → Workers & Pages → Hyperdrive → create config → copy ID)
+- `STREAM_ACCOUNT_ID` with your Cloudflare account ID
+- `STREAM_CUSTOMER_DOMAIN` with the subdomain shown in Cloudflare Stream → Settings → Customer Domain
 
 ### 5. Run locally
 

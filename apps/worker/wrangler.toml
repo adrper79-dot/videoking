@@ -15,6 +15,9 @@ class_name = "UserPresence"
 tag = "v1"
 new_classes = ["VideoRoom", "UserPresence"]
 
+# Hyperdrive binding for low-latency access to Neon Postgres.
+# To get your Hyperdrive ID: Cloudflare dashboard → Workers & Pages → Hyperdrive
+# → create a new config pointing at your Neon connection string → copy the ID here.
 [[hyperdrive]]
 binding = "DB"
 id = "YOUR_HYPERDRIVE_ID"
@@ -24,5 +27,10 @@ binding = "R2_BUCKET"
 bucket_name = "nichestream-assets"
 
 [vars]
+# Your Cloudflare account ID (found in the dashboard top-right or via `wrangler whoami`)
 STREAM_ACCOUNT_ID = ""
+# Your Cloudflare Stream customer subdomain.
+# Found in the Stream dashboard under Settings → Customer Domain.
+# Example: if your Stream URLs look like customer-abc123.cloudflarestream.com, set "abc123".
+STREAM_CUSTOMER_DOMAIN = ""
 PLATFORM_FEE_PERCENT = "20"

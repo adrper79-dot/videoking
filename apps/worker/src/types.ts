@@ -8,6 +8,13 @@ export interface Env {
   STREAM_API_TOKEN: string;
   /** Cloudflare account ID for Stream */
   STREAM_ACCOUNT_ID: string;
+  /**
+   * Cloudflare Stream customer subdomain (the unique domain prefix shown in the
+   * Stream dashboard under "Customer Domain", e.g. "abc123" for
+   * https://customer-abc123.cloudflarestream.com).
+   * This is distinct from the account ID.
+   */
+  STREAM_CUSTOMER_DOMAIN: string;
   /** Stripe secret key */
   STRIPE_SECRET_KEY: string;
   /** Stripe webhook signing secret */

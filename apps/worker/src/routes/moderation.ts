@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { eq, desc, and, gte } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import type { Env } from "../types";
 import { createDb } from "../lib/db";
 import { createAuth } from "../lib/auth";
@@ -143,65 +143,6 @@ moderationRouter.patch("/reports/:id", async (c) => {
   } catch (err) {
     console.error("PATCH /api/moderation/reports/:id error:", err);
     return c.json({ error: "InternalError", message: "Failed to update report" }, 500);
-  }
-});
-
-/** GET /api/moderation/dashboard/earnings - Creator earnings summary */
-moderationRouter.get("/dashboard/earnings", async (c) => {
-  const db = createDb(c.env);
-  const auth = createAuth(db, c.env);
-
-  const session = await auth.api.getSession({ headers: c.req.raw.headers });
-  if (!session?.user) {
-    return c.json({ error: "Unauthorized", message: "Authentication required" }, 401);
-  }
-
-  const { earnings } = await import("@nichestream/db");
-
-  try {
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-
-    const allEarnings = await db
-      .select()
-      .from(earnings)
-      .where(
-        and(
-          eq(earnings.creatorId, session.user.id),
-          gte(earnings.createdAt, thirtyDaysAgo),
-        ),
-      )
-      .orderBy(desc(earnings.createdAt));
-
-    const summary = allEarnings.reduce(
-      (acc, e) => {
-        acc.totalGrossCents += e.grossAmountCents;
-        acc.totalNetCents += e.netAmountCents;
-        if (e.status === "pending") acc.pendingCents += e.netAmountCents;
-        if (e.status === "transferred") acc.transferredCents += e.netAmountCents;
-        if (e.type === "subscription_share")
-          acc.breakdown.subscriptionShareCents += e.netAmountCents;
-        if (e.type === "unlock_purchase")
-          acc.breakdown.unlockPurchaseCents += e.netAmountCents;
-        if (e.type === "tip") acc.breakdown.tipCents += e.netAmountCents;
-        return acc;
-      },
-      {
-        totalGrossCents: 0,
-        totalNetCents: 0,
-        pendingCents: 0,
-        transferredCents: 0,
-        breakdown: {
-          subscriptionShareCents: 0,
-          unlockPurchaseCents: 0,
-          tipCents: 0,
-        },
-      },
-    );
-
-    return c.json({ summary, recent: allEarnings.slice(0, 20) });
-  } catch (err) {
-    console.error("GET /api/dashboard/earnings error:", err);
-    return c.json({ error: "InternalError", message: "Failed to fetch earnings" }, 500);
   }
 });
 
