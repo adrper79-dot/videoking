@@ -41,9 +41,9 @@ export function useVideoPlayer({ iframeRef }: UseVideoPlayerOptions): UseVideoPl
     buffered: 0,
   });
 
-  // Cloudflare Stream uses a customer-subdomain origin for postMessage
-  // We use "*" to accept messages from any Stream origin (all share the same API)
-  const playerOrigin = "*";
+  // Cloudflare Stream uses a per-account customer subdomain for postMessage.
+  // We validate event.origin in the message handler to guard against spoofing.
+  const playerOrigin = "*"; // origin checked below via event.origin validation
 
   /** Send a command to the Stream player via postMessage. */
   const sendCommand = useCallback(
@@ -59,6 +59,14 @@ export function useVideoPlayer({ iframeRef }: UseVideoPlayerOptions): UseVideoPl
   // Listen for events from the Stream player
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
+      // Only accept messages from Cloudflare Stream customer subdomains
+      if (
+        event.origin !== "https://cloudflarestream.com" &&
+        !event.origin.endsWith(".cloudflarestream.com")
+      ) {
+        return;
+      }
+
       if (!event.data || typeof event.data !== "object") return;
 
       const { event: eventName, data } = event.data as {

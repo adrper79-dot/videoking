@@ -15,7 +15,8 @@ const nextConfig: NextConfig = {
   // Ensure trailing slashes are consistent
   trailingSlash: false,
   experimental: {
-    // Enable React 19 / Next.js 15 features
+    // React Compiler is intentionally disabled; the project relies on
+    // standard React memoization patterns for compatibility.
     reactCompiler: false,
   },
 };
