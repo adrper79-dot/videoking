@@ -27,7 +27,7 @@ Generated: 2026-04-13 | Loop: 1
 | C-5 | 🟢 DONE | `apps/worker/src/routes/channels.ts:41-51` | Added filters for status=ready visibility=public; private/deleted videos no longer leak |
 | C-6 | 🟢 DONE | `apps/worker/src/lib/auth.ts`; `packages/db/src/schema/` | Created auth.ts schema with sessions, accounts, verifications, processedWebhookEvents tables |
 | C-7 | 🟢 DONE | `apps/worker/src/routes/webhooks.ts:~185-210` | Added `insertEarnings` flag; earnings only inserted on `subscription.created`, not on `updated` |
-| C-8 | 🟡 IN PROGRESS | `apps/worker/src/routes/webhooks.ts:14-90` | processedWebhookEvents table created; idempotency check not yet integrated into handler |
+| C-8 | � DONE | `apps/worker/src/routes/webhooks.ts:14-90` | Idempotency check fully implemented: duplicate detection → record event before processing → handle safely |
 | C-9 | 🟡 IN PROGRESS | `apps/worker/src/routes/stripe.ts:~155-185`; `webhooks.ts:~185-210` | Earnings dedup fixed (C-7); payout routing still needs transfer_data mechanism design |
 
 ---
@@ -96,13 +96,13 @@ Generated: 2026-04-13 | Loop: 1
 ## Completed Items
 
 **Loop 1+2 Session Summary**:
-- **🟢 CRITICAL**: 7/9 fixed (C-1, C-2, C-3, C-4, C-5, C-6, C-7) | 2 partial/open (C-8, C-9)
+- **🟢 CRITICAL**: 8/9 fixed (C-1, C-2, C-3, C-4, C-5, C-6, C-7, C-8) | 1 partial/design-pending (C-9)
 - **🟢 HIGH**: 12/13 fixed (H-1, H-2, H-3, H-4, H-5, H-6, H-7, H-8, H-9, H-10, H-12) | 1 open (H-11)
 - **🟢 MEDIUM**: 11/11 fixed (M-1, M-2, M-3, M-4, M-5, M-6, M-7, M-8, M-9, M-10, M-11) | 0 open ✅
 - **🟢 BUILD/CONFIG**: 5/6 fixed (BC-2, BC-3, BC-4, BC-5, BC-6) | 1 open (BC-1)
 - **🟢 CROSS-CUTTING**: 3/4 fixed (XC-2, XC-3, XC-4) | 1 in-progress (XC-1)
 
-**Summary**: 38 issues fixed (76%) | 1 in-progress (2%) | 5 remaining (10%) | 7 files created | 26+ files modified | All packages typecheck passing ✅
+**Summary**: 39 issues fixed (79%) | 1 design-pending (2%) | 4 remaining (8%) | 7 files created | 26+ files modified | All packages typecheck passing ✅
 
 **Loop 3 Changes (continued)**:
 - Created `apps/worker/src/middleware/session.ts` with requireSession() middleware
