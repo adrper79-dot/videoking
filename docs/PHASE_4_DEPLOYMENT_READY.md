@@ -2,7 +2,9 @@
 
 **Status**: All Phase 4 code merged to `main` and pushed to GitHub  
 **Date**: 2026-04-13  
-**Commits Pushed**: 9 (from 8b990eb to 1c4b6c8)
+**Commits Pushed**: 12 (from 5e6f720 to 0eed9f2)
+**Git Branch**: `main` (fully synced)
+**TypeScript Check**: ✅ 4/4 packages compile (0 errors)
 
 ---
 
@@ -46,6 +48,9 @@ Phase 4 of NicheStream is **production-ready and deployed to GitHub**. All 9 fea
 
 | Hash | Message | Status |
 |------|---------|--------|
+| 0eed9f2 | config: Add Phase 4 Stripe Connect environment variables to wrangler.toml | ✅ Merged |
+| 346fd17 | feat: Generate Phase 4 database migration with referrals, cohorts, churn, and payouts tables | ✅ Merged |
+| 9b08edf | docs: Add Phase 4 deployment ready documentation | ✅ Merged |
 | 1c4b6c8 | feat: Implement Phase 4 payout engine database queries | ✅ Merged |
 | 33d90b2 | feat: Implement Phase 4 analytics system with database queries | ✅ Merged |
 | 24558b4 | feat: Implement Phase 4 referral system database queries | ✅ Merged |
@@ -63,13 +68,65 @@ Phase 4 of NicheStream is **production-ready and deployed to GitHub**. All 9 fea
 - ✅ Database: Schema complete with relations
 - ✅ Git: All commits pushed to origin/main
 
-### Next Steps
+### Next Steps for Production Deployment
 
-1. **Database Migration** — Run `pnpm db:migrate` in production
-2. **Deploy Worker** — `cd apps/worker && pnpm deploy`
-3. **Deploy Web** — `cd apps/web && pnpm build:pages && pnpm deploy`
-4. **Configure CRON** — Set up scheduled payout job
-5. **Monitor** — Watch analytics and payout logs
+**Prerequisites Completed** ✅
+- ✅ All Phase 4 code implemented and tested
+- ✅ TypeScript compilation passing (0 errors)
+- ✅ Database migration generated (0001_parallel_mephistopheles.sql)
+- ✅ Environment variables configured in wrangler.toml
+- ✅ All commits pushed to GitHub
+- ✅ Documentation complete
+
+**Deployment Steps** (to be executed):
+1. **Set Secrets** — Configure in Cloudflare Workers dashboard:
+   ```bash
+   wrangler secret put BETTER_AUTH_SECRET
+   wrangler secret put STRIPE_SECRET_KEY
+   wrangler secret put STRIPE_WEBHOOK_SECRET
+   wrangler secret put STREAM_API_TOKEN
+   ```
+
+2. **Configure Variables** — Set Phase 4 specific variables:
+   ```bash
+   wrangler secret put STRIPE_CONNECT_CLIENT_ID
+   wrangler secret put STREAM_ACCOUNT_ID
+   wrangler secret put STREAM_CUSTOMER_DOMAIN
+   wrangler secret put STRIPE_CITIZEN_MONTHLY_PRICE
+   wrangler secret put STRIPE_CITIZEN_ANNUAL_PRICE
+   wrangler secret put STRIPE_VIP_MONTHLY_PRICE
+   wrangler secret put STRIPE_VIP_ANNUAL_PRICE
+   ```
+
+3. **Database Migration** — Apply to production Neon PostgreSQL:
+   ```bash
+   cd packages/db
+   pnpm db:migrate
+   ```
+
+4. **Deploy Worker** — Push Phase 4 endpoints:
+   ```bash
+   cd apps/worker
+   pnpm deploy
+   ```
+
+5. **Deploy Web** — Update frontend for Phase 4 features:
+   ```bash
+   cd apps/web
+   pnpm build:pages
+   pnpm deploy
+   ```
+
+6. **Configure CRON** — Set up monthly payout job in Cloudflare:
+   - Create scheduled trigger for `handleMonthlyPayoutCron`
+   - Schedule: First day of month at 00:00 UTC
+   - Timeout: 600 seconds (10 minutes)
+
+7. **Monitor** — Verify in production:
+   - Check `/api/admin/analytics/*` endpoints responding
+   - Check `/api/referrals/*` endpoints responding
+   - Monitor payout_runs table for successful transfers
+   - Watch Stripe webhook logs for transfer confirmations
 
 ### Testing Checklist
 
