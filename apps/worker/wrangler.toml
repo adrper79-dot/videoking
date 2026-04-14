@@ -44,7 +44,7 @@ CHAT_RATE_LIMIT_VIP_MS = "500"
 TRIAL_PERIOD_DAYS = "14"
 # Public URL of the web frontend (used for Stripe and BetterAuth redirect URLs)
 # Set to your actual domain or override via wrangler secret for production
-APP_BASE_URL = "http://localhost:3000"
+APP_BASE_URL = "https://itsjusus.com"
 # Stripe Connect Client ID for creator account onboarding
 STRIPE_CONNECT_CLIENT_ID = ""
 # Platform fee percentage for creator payouts (deducted from revenue)

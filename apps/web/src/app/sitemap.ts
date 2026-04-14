@@ -1,7 +1,7 @@
 import type { MetadataRoute } from "next";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8787";
-const APP_BASE_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://nichestream.tv";
+const APP_BASE_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://itsjusus.com";
 
 interface VideoListItem {
   id: string;

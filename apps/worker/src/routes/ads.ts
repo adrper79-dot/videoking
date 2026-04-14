@@ -208,7 +208,7 @@ function generateVastXml(options: {
             </TrackingEvents>
             <VideoClicks>
               <ClickThrough>
-                <![CDATA[https://nichestream.tv]]>
+                <![CDATA[https://itsjusus.com]]>
               </ClickThrough>
             </VideoClicks>
             <MediaFiles>

@@ -13,7 +13,7 @@ export async function uploadToR2(
     httpMetadata: { contentType },
   });
   // R2 public URL assumes the bucket is configured with a public domain
-  return `https://assets.nichestream.tv/${key}`;
+  return `https://assets.itsjusus.com/${key}`;
 }
 
 /**
@@ -28,7 +28,7 @@ export async function deleteFromR2(env: Env, key: string): Promise<void> {
  * Falls back to a direct key path for development.
  */
 export function r2ObjectUrl(key: string): string {
-  return `https://assets.nichestream.tv/${key}`;
+  return `https://assets.itsjusus.com/${key}`;
 }
 
 /**

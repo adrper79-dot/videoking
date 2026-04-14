@@ -22,7 +22,7 @@ export class EmailService {
   private apiKey: string;
   private fromEmail: string;
 
-  constructor(apiKey: string, fromEmail = "noreply@nichestream.tv") {
+  constructor(apiKey: string, fromEmail = "noreply@itsjusus.com") {
     this.apiKey = apiKey;
     this.fromEmail = fromEmail;
   }
@@ -123,7 +123,7 @@ export class EmailService {
               <p>Hi ${userName},</p>
               <p>Your 14-day free NicheStream trial expires in <strong>${daysRemaining} days</strong>.</p>
               <p>To keep watching exclusive videos, hosting watch parties, and chatting with creators, subscribe to Citizen for just <strong>$1/month</strong>.</p>
-              <a href="https://nichestream.tv/pricing?offer=trial_urgent" class="cta">Subscribe Now</a>
+              <a href="https://itsjusus.com/pricing?offer=trial_urgent" class="cta">Subscribe Now</a>
               <p style="color: #666; font-size: 12px;">No commitment — cancel anytime.</p>
             </div>
             <div class="footer">
@@ -157,7 +157,7 @@ export class EmailService {
               <p>Your trial has ended, but the community is still here.</p>
               <p>Come back and join Citizen for <strong>$1/month</strong> — the same price.</p>
               <p>Catch up on new videos, resume watch parties, and reconnect with creators.</p>
-              <a href="https://nichestream.tv/pricing?offer=trial_recovery" class="cta">Reactivate Subscription</a>
+              <a href="https://itsjusus.com/pricing?offer=trial_recovery" class="cta">Reactivate Subscription</a>
             </div>
             <div class="footer">
               <p>© NicheStream — Supporting niche creators everywhere</p>
@@ -248,7 +248,7 @@ export class EmailService {
               <p>Congratulations! Your creator earnings have reached:</p>
               <div class="amount">$${amount}</div>
               <p>View your earnings dashboard and request a payout.</p>
-              <a href="https://nichestream.tv/dashboard/earnings" class="cta">View Dashboard</a>
+              <a href="https://itsjusus.com/dashboard/earnings" class="cta">View Dashboard</a>
             </div>
           </div>
         </body>
