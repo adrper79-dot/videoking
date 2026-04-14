@@ -88,17 +88,34 @@ export function PricingClient() {
           </div>
         </section>
 
-        <section className="rounded-3xl border border-neutral-800 bg-neutral-900 p-6">
-          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-amber-300">VIP</p>
-          <h2 className="mt-3 text-3xl font-bold text-white">$5-$9/mo</h2>
-          <p className="mt-2 text-sm text-neutral-400">Future layer for super-fans who want priority access, exclusive drops, and deeper creator rooms.</p>
-          <ul className="mt-6 space-y-3 text-sm text-neutral-300">
+        <section className="rounded-3xl border border-amber-500/40 bg-[linear-gradient(180deg,rgba(217,119,6,0.18),rgba(15,15,15,0.94))] p-6 shadow-[0_20px_80px_rgba(217,119,6,0.15)]">
+          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-amber-200">VIP</p>
+          <div className="mt-3 flex items-end gap-3">
+            <h2 className="text-3xl font-bold text-white">$7/mo</h2>
+            <span className="pb-1 text-sm text-amber-100/80">or $70/year</span>
+          </div>
+          <p className="mt-2 text-sm text-amber-50/80">For superfans: private watch parties, video downloads, Creator AMAs, VIP chat badge, and priority support.</p>
+          <ul className="mt-6 space-y-3 text-sm text-white/90">
             <li>Everything in Citizen</li>
-            <li>Priority support and private sessions</li>
-            <li>Higher-value perks per creator niche</li>
-            <li>Natural upgrade path for top fans</li>
+            <li>Private 1:1 watch parties with creators</li>
+            <li>Download videos for offline viewing</li>
+            <li>Exclusive VIP chat badge and recognition</li>
+            <li>Priority support and direct creator access</li>
           </ul>
-          <div className="mt-8 text-xs uppercase tracking-[0.2em] text-neutral-500">Planned after core Citizen rollout</div>
+          <div className="mt-8 space-y-2">
+            {isAuthenticated ? (
+              <>
+                <Link href="/" className="inline-block rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-600">
+                  Explore VIP benefits
+                </Link>
+                <p className="text-xs text-white/70">Find creators offering VIP tiers to upgrade from their creator pages.</p>
+              </>
+            ) : (
+              <Link href="/sign-up?tier=vip" className="inline-block rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-600">
+                Create VIP account
+              </Link>
+            )}
+          </div>
         </section>
       </div>
     </div>
