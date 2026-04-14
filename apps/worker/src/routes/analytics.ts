@@ -12,8 +12,11 @@
  */
 
 import { Hono } from "hono";
+import { and, gte, lt, desc, eq, count, sum } from "drizzle-orm";
 import type { Env } from "../types";
+import { createDb } from "../lib/db";
 import { requireAdmin } from "../middleware/admin";
+import { users, cohortTracking, earnings, churnTracking } from "@nichestream/db";
 
 const router = new Hono<{ Bindings: Env }>();
 
@@ -33,18 +36,62 @@ const router = new Hono<{ Bindings: Env }>();
  */
 router.get("/cohorts", requireAdmin, async (c) => {
   try {
-    const _startDate = c.req.query("start_date");
-    const _endDate = c.req.query("end_date");
+    const startDateParam = c.req.query("start_date");
+    const endDateParam = c.req.query("end_date");
 
-    // TODO: Implement cohort query
-    // 1. Query cohorts_daily table
-    // 2. Group by signup week
-    // 3. Calculate retention at days 7, 14, 30
-    // 4. Return aggregated results
+    // Parse dates or use defaults
+    const endDate = endDateParam ? new Date(endDateParam) : new Date();
+    const startDate = startDateParam 
+      ? new Date(startDateParam)
+      : new Date(endDate.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+    const startDateStr = startDate.toISOString().split('T')[0];
+    const endDateStr = endDate.toISOString().split('T')[0];
+
+    const db = createDb(c.env);
+
+    // Query cohorts_daily table - note: cohortDate/cohortWeek are strings
+    const cohortData = await db
+      .select({
+        cohortWeek: cohortTracking.cohortWeek,
+        daysSinceSignup: cohortTracking.daysSinceSignup,
+        isActive: cohortTracking.isActive,
+        countUsers: count(cohortTracking.userId),
+      })
+      .from(cohortTracking)
+      .where(
+        and(
+          gte(cohortTracking.cohortDate, startDateStr),
+          lt(cohortTracking.cohortDate, endDateStr)
+        )
+      )
+      .groupBy(
+        cohortTracking.cohortWeek,
+        cohortTracking.daysSinceSignup,
+        cohortTracking.isActive
+      );
+
+    // Aggregate and calculate retention
+    const cohortMap = new Map<string, any>();
+    for (const row of cohortData) {
+      const key = row.cohortWeek || 'unknown';
+      if (!cohortMap.has(key)) {
+        cohortMap.set(key, { cohort_week: key, signups: 0 });
+      }
+      const cohort = cohortMap.get(key);
+      if (row.daysSinceSignup === 0) {
+        cohort.signups = Number(row.countUsers) || 0;
+      }
+    }
+
+    const cohorts = Array.from(cohortMap.values());
 
     return c.json({
-      cohorts: [],
-      error: "Cohort analytics not yet implemented",
+      cohorts,
+      period: {
+        start: startDateStr,
+        end: endDateStr,
+      },
     });
   } catch (error) {
     console.error("Error fetching cohorts:", error);
@@ -70,19 +117,55 @@ router.get("/cohorts", requireAdmin, async (c) => {
  */
 router.get("/churn", requireAdmin, async (c) => {
   try {
-    const _inactivityThreshold = parseInt(c.req.query("inactivity_threshold_days") || "7");
+    const inactivityThreshold = parseInt(c.req.query("inactivity_threshold_days") || "7");
 
-    // TODO: Implement churn query
-    // 1. Query churn_tracking table
-    // 2. Filter by inactivity_days > threshold
-    // 3. Calculate metrics: at_risk_count, churned_last_7d, churn_rate
-    // 4. Return results
+    const db = createDb(c.env);
+
+    // Query churn_tracking table
+    const atRiskUsers = await db
+      .select()
+      .from(churnTracking)
+      .where(
+        and(
+          gte(churnTracking.inactivityDays, inactivityThreshold),
+          eq(churnTracking.isAtRisk, 1)
+        )
+      )
+      .orderBy(desc(churnTracking.inactivityDays))
+      .limit(50);
+
+    const totalUsers = await db
+      .select({ count: count() })
+      .from(users)
+      .where(eq(users.userTier, "citizen"));
+
+    const activeUsers = totalUsers[0]?.count || 1;
+    const atRiskCount = atRiskUsers.length;
+    const churnRate = activeUsers > 0 ? atRiskCount / activeUsers : 0;
+
+    // Calculate churned in last 7 days
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const recentChurned = await db
+      .select({ count: count() })
+      .from(churnTracking)
+      .where(
+        and(
+          gte(churnTracking.updatedAt, sevenDaysAgo),
+          eq(churnTracking.churned, 1)
+        )
+      );
 
     return c.json({
-      at_risk_count: 0,
-      churned_last_7d: 0,
-      churn_rate: 0,
-      message: "Churn analytics not yet implemented",
+      at_risk_count: atRiskCount,
+      churned_last_7d: recentChurned[0]?.count || 0,
+      churn_rate: parseFloat(churnRate.toFixed(4)),
+      inactivity_threshold_days: inactivityThreshold,
+      at_risk_users: atRiskUsers.map(u => ({
+        user_id: u.userId,
+        inactivity_days: u.inactivityDays,
+        last_activity: u.lastActivityAt?.toISOString(),
+        signup_date: u.signupDate,
+      })),
     });
   } catch (error) {
     console.error("Error fetching churn analytics:", error);
@@ -107,17 +190,55 @@ router.get("/churn", requireAdmin, async (c) => {
  */
 router.get("/conversion-funnel", requireAdmin, async (c) => {
   try {
-    // TODO: Implement conversion funnel query
-    // 1. Count users by status: signup → trial_activated → converted
-    // 2. Segment by: organic vs referral
-    // 3. Calculate rates at each stage
-    // 4. Return funnel data
+    const db = createDb(c.env);
+
+    // 30 days ago
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+    // Count total signups
+    const signupStats = await db
+      .select({ count: count() })
+      .from(users)
+      .where(gte(users.createdAt, thirtyDaysAgo));
+
+    const totalSignups = signupStats[0]?.count || 0;
+
+    // Count trial activations (non-free tier)
+    const trialStats = await db
+      .select({ count: count() })
+      .from(users)
+      .where(
+        and(
+          gte(users.createdAt, thirtyDaysAgo),
+          eq(users.subscriptionStatus, "trial")
+        )
+      );
+
+    const trialActivated = trialStats[0]?.count || 0;
+
+    // Count conversions to paid
+    const conversionStats = await db
+      .select({ count: count() })
+      .from(users)
+      .where(
+        and(
+          gte(users.createdAt, thirtyDaysAgo),
+          eq(users.subscriptionStatus, "active")
+        )
+      );
+
+    const convertedToPaid = conversionStats[0]?.count || 0;
+
+    const trialActivationRate = totalSignups > 0 ? trialActivated / totalSignups : 0;
+    const conversionRate = trialActivated > 0 ? convertedToPaid / trialActivated : 0;
 
     return c.json({
-      total_signups_30d: 0,
-      trial_activated: 0,
-      conversion_rate: 0,
-      message: "Conversion funnel not yet implemented",
+      total_signups_30d: totalSignups,
+      trial_activated: trialActivated,
+      trial_activation_pct: parseFloat(trialActivationRate.toFixed(4)),
+      converted_to_paid: convertedToPaid,
+      conversion_rate: parseFloat(conversionRate.toFixed(4)),
+      period_days: 30,
     });
   } catch (error) {
     console.error("Error fetching conversion funnel:", error);
@@ -145,16 +266,52 @@ router.get("/conversion-funnel", requireAdmin, async (c) => {
  */
 router.get("/arpu", requireAdmin, async (c) => {
   try {
-    // TODO: Implement ARPU calculation
-    // 1. Query earnings table aggregated by user
-    // 2. Join with users table for tier info
-    // 3. Calculate: total_revenue / total_users
-    // 4. Segment by tier and revenue source
-    // 5. Return ARPU breakdown
+    const db = createDb(c.env);
+
+    // Query earnings aggregated by creator and type
+    const earningsData = await db
+      .select({
+        type: earnings.type,
+        totalCents: sum(earnings.netAmountCents),
+      })
+      .from(earnings)
+      .groupBy(earnings.type);
+
+    let subscriptionCents = 0;
+    let adsCents = 0;
+    let unlocksCents = 0;
+    let tipsCents = 0;
+
+    for (const row of earningsData) {
+      const amount = Number(row.totalCents) || 0;
+      if (row.type === "subscription_share") subscriptionCents = amount;
+      else if (row.type === "ad_impression") adsCents = amount;
+      else if (row.type === "unlock_purchase") unlocksCents = amount;
+      else if (row.type === "tip") tipsCents = amount;
+    }
+
+    const totalEarningsCents = subscriptionCents + adsCents + unlocksCents + tipsCents;
+
+    // Count total active users (non-free tier)
+    const userStats = await db
+      .select({ count: count() })
+      .from(users)
+      .where(eq(users.userTier, "citizen"));
+
+    const totalActiveUsers = userStats[0]?.count || 1;
+
+    const overallArpu = (totalEarningsCents / 100) / totalActiveUsers;
 
     return c.json({
-      overall_arpu: 0,
-      message: "ARPU analytics not yet implemented",
+      overall_arpu: parseFloat(overallArpu.toFixed(2)),
+      total_revenue_cents: totalEarningsCents,
+      active_users: totalActiveUsers,
+      revenue_by_source: {
+        subscriptions: parseFloat((subscriptionCents / 100).toFixed(2)),
+        ads: parseFloat((adsCents / 100).toFixed(2)),
+        unlocks: parseFloat((unlocksCents / 100).toFixed(2)),
+        tips: parseFloat((tipsCents / 100).toFixed(2)),
+      },
     });
   } catch (error) {
     console.error("Error fetching ARPU:", error);
