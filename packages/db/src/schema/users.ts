@@ -53,4 +53,7 @@ export const users = pgTable("users", {
       referral_bonuses: true,
       community_updates: false,
     }),
+  // Phase 5: Ad monetization - frequency capping
+  lastAdServedAt: timestamp("last_ad_served_at", { withTimezone: true }),
+  adFrequencyLimitMs: integer("ad_frequency_limit_ms").notNull().default(600000), // 10 minutes by default
 });

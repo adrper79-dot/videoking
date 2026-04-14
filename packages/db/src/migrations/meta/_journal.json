@@ -29,6 +29,13 @@
       "when": 1776183457508,
       "tag": "0003_odd_wolf_cub",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1776184002411,
+      "tag": "0004_smooth_vargas",
+      "breakpoints": true
     }
   ]
 }

@@ -9,7 +9,6 @@ import { cn } from "@/lib/utils";
 interface VideoPlayerProps {
   streamVideoId: string;
   title: string;
-  creatorId?: string;
   showAds?: boolean;
   /** Pre-signed URL for private videos. Omit for public videos. */
   playbackUrl?: string;
@@ -25,7 +24,6 @@ interface VideoPlayerProps {
 export function VideoPlayer({
   streamVideoId,
   title,
-  creatorId,
   showAds = false,
   playbackUrl,
   customerSubdomain,
@@ -39,14 +37,14 @@ export function VideoPlayer({
   
   // Log ad impression on mount if showAds is true
   useEffect(() => {
-    if (showAds && streamVideoId && creatorId) {
+    if (showAds && streamVideoId) {
       // Fire and forget; log after a short delay to ensure component stability
       const timer = setTimeout(() => {
-        logAdImpression(streamVideoId, creatorId, "placeholder", 0);
+        logAdImpression(streamVideoId, "impression");
       }, 1000);
       return () => clearTimeout(timer);
     }
-  }, [showAds, streamVideoId, creatorId]);
+  }, [showAds, streamVideoId]);
   
   // Broadcast current playback time to context for watch party sync
   useEffect(() => {

@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { VideoPlayer } from "@/components/VideoPlayer";
-import { VideoPlaybackProvider } from "@/components/VideoPlaybackContext";
+import { ClientVideoWatcher } from "@/components/ClientVideoWatcher";
 import { InteractivityOverlay } from "@/components/InteractivityOverlay";
+import { VideoPlaybackProvider } from "@/components/VideoPlaybackContext";
 import { api } from "@/lib/api";
 import type { Video } from "@nichestream/types";
 
@@ -52,13 +52,7 @@ export default async function WatchPage({ params }: WatchPageProps) {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_360px]">
         {/* Main content */}
         <div className="space-y-4">
-          <VideoPlaybackProvider>
-            <VideoPlayer
-              streamVideoId={video.cloudflareStreamId}
-              title={video.title}
-              playbackUrl={video.playbackUrl ?? undefined}
-            />
-          </VideoPlaybackProvider>
+          <ClientVideoWatcher video={video} />
 
           <div className="rounded-xl border border-neutral-800 bg-neutral-900 p-5">
             <h1 className="text xl font-bold text-white">{video.title}</h1>
