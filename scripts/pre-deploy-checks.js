@@ -202,11 +202,63 @@ try {
 }
 console.log();
 
-// ====== 7. DNS Verification (Optional - requires network) ======
-console.log("7️⃣  DNS Resolution (Optional - Network Check)");
-import("dns").then(async (dnsModule) => {
+// ====== 7. Production Endpoint Checks ======
+console.log("7️⃣  Production Endpoints (Optional - requires internet)");
+const fetchEndpoints = async () => {
   try {
-    const dns = dnsModule;
+    const appUrl = "https://itsjusus.com";
+    
+    // Check homepage
+    try {
+      const homeRes = await fetch(appUrl, { method: "HEAD", timeout: 5000 });
+      if (homeRes.ok) {
+        success(`${appUrl} → HTTP ${homeRes.status}`);
+      } else {
+        warn(`${appUrl} → HTTP ${homeRes.status}`);
+      }
+    } catch (e) {
+      warn(`Cannot check ${appUrl}: ${e.message}`);
+    }
+
+    // Check manifest.webmanifest
+    try {
+      const manifestRes = await fetch(`${appUrl}/manifest.webmanifest`, { method: "HEAD", timeout: 5000 });
+      if (manifestRes.ok) {
+        success(`${appUrl}/manifest.webmanifest → HTTP ${manifestRes.status}`);
+      } else {
+        error(`${appUrl}/manifest.webmanifest → HTTP ${manifestRes.status} (expected 200)`);
+      }
+    } catch (e) {
+      warn(`Cannot check manifest.webmanifest: ${e.message}`);
+    }
+
+    // Check favicon
+    try {
+      const faviconRes = await fetch(`${appUrl}/favicon.ico`, { method: "HEAD", timeout: 5000 });
+      if (faviconRes.ok) {
+        success(`${appUrl}/favicon.ico → HTTP ${faviconRes.status}`);
+      } else {
+        warn(`${appUrl}/favicon.ico → HTTP ${faviconRes.status}`);
+      }
+    } catch (e) {
+      warn(`Cannot check favicon: ${e.message}`);
+    }
+
+    console.log();
+    performDnsChecks();
+  } catch (e) {
+    warn(`Endpoint check failed: ${e.message}`);
+    console.log();
+    performDnsChecks();
+  }
+};
+
+// ====== 8. DNS Verification (Optional - requires network) ======
+const performDnsChecks = async () => {
+  console.log("8️⃣  DNS Resolution (Optional - Network Check)");
+  try {
+    const dnsModule = await import("dns");
+    const dns = dnsModule.default || dnsModule;
     const lookup = (hostname) => new Promise((resolve) => {
       dns.lookup(hostname, (err, address) => {
         if (err) {
@@ -243,10 +295,7 @@ import("dns").then(async (dnsModule) => {
     warn(`DNS check unavailable: ${e.message}`);
     printSummary();
   }
-}).catch((e) => {
-  warn(`DNS check unavailable: ${e.message}`);
-  printSummary();
-});
+};
 
 function printSummary() {
   console.log();
@@ -264,3 +313,6 @@ function printSummary() {
     process.exit(1);
   }
 }
+
+// Start endpoint checks, which will chain to DNS checks
+fetchEndpoints();
