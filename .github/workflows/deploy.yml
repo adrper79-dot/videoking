@@ -38,10 +38,20 @@ jobs:
       - name: Type check
         run: pnpm typecheck
 
+      - name: Pre-deployment checks
+        env:
+          NEXT_PUBLIC_API_URL: "https://api.itsjusus.com"
+          NEXT_PUBLIC_APP_URL: "https://itsjusus.com"
+        run: pnpm pre-deploy-check
+
       - name: Build Worker
         run: cd apps/worker && pnpm build
 
       - name: Build Web (Pages)
+        env:
+          NEXT_PUBLIC_API_URL: "https://api.itsjusus.com"
+          NEXT_PUBLIC_APP_URL: "https://itsjusus.com"
+          NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY }}
         run: cd apps/web && pnpm build:pages
 
       - name: Validate Cloudflare Credentials
