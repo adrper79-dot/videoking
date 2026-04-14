@@ -11,6 +11,7 @@ export const metadata: Metadata = {
   },
   description:
     "Discover and watch hyper-niche interactive videos. Live chat, polls, watch parties, and creator monetization.",
+  manifest: "/manifest.json",
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "https://nichestream.tv"),
   openGraph: {
     type: "website",
