@@ -12,6 +12,8 @@ export * from "./events";
 export * from "./assets";
 // Phase 3: Ad monetization
 export * from "./ads";
+// Phase 4: Creator payouts, referrals, analytics
+export * from "./referrals";
 
 // ─── Drizzle Relations (defined here to avoid circular imports) ───────────────
 import { relations } from "drizzle-orm";
@@ -22,6 +24,7 @@ import { earnings, connectedAccounts } from "./earnings";
 import { chatMessages, polls, pollVotes, videoUnlocks } from "./interactions";
 import { playlists, playlistVideos } from "./playlists";
 import { moderationReports } from "./moderation";
+import { referrals, churnTracking, payoutRuns, cohortTracking } from "./referrals";
 
 export const usersRelations = relations(users, ({ many }) => ({
   videos: many(videos),
@@ -33,6 +36,9 @@ export const usersRelations = relations(users, ({ many }) => ({
   pollVotes: many(pollVotes),
   playlists: many(playlists),
   moderationReports: many(moderationReports),
+  referralsSent: many(referrals, { relationName: "referredBy" }),
+  referralsReceived: many(referrals, { relationName: "referred" }),
+  cohortTracking: many(cohortTracking),
 }));
 
 export const videosRelations = relations(videos, ({ one, many }) => ({
@@ -104,5 +110,32 @@ export const moderationReportsRelationsExt = relations(moderationReports, ({ one
     fields: [moderationReports.reporterId],
     references: [users.id],
   }),
+}));
+
+// ─── Phase 4: Referrals, Analytics & Payouts Relations ──────────────────────
+
+export const referralsRelationsExt = relations(referrals, ({ one }) => ({
+  referred: one(users, {
+    fields: [referrals.referredUserId],
+    references: [users.id],
+    relationName: "referred",
+  }),
+  referredBy: one(users, {
+    fields: [referrals.referredByUserId],
+    references: [users.id],
+    relationName: "referredBy",
+  }),
+}));
+
+export const churnTrackingRelationsExt = relations(churnTracking, ({ one }) => ({
+  user: one(users, { fields: [churnTracking.userId], references: [users.id] }),
+}));
+
+export const payoutRunsRelationsExt = relations(payoutRuns, ({ one }) => ({
+  creator: one(users, { fields: [payoutRuns.creatorId], references: [users.id] }),
+}));
+
+export const cohortTrackingRelationsExt = relations(cohortTracking, ({ one }) => ({
+  user: one(users, { fields: [cohortTracking.userId], references: [users.id] }),
 }));
 
