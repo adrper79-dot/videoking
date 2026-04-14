@@ -5,6 +5,7 @@ import { ChatPanel } from "./ChatPanel";
 import { PollWidget } from "./PollWidget";
 import { ReactionBar } from "./ReactionBar";
 import { WatchParty } from "./WatchParty";
+import { ChatRateLimitUpsell } from "./ChatRateLimitUpsell";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import type { ChatMessage, Poll, UserTier, WSMessage } from "@nichestream/types";
 import { useEntitlements } from "./EntitlementsContext";
@@ -28,6 +29,7 @@ export function InteractivityOverlay({ videoId }: InteractivityOverlayProps) {
   const [reactionCounts, setReactionCounts] = useState<Record<string, number>>({});
   const [connectedCount, setConnectedCount] = useState(0);
   const [notice, setNotice] = useState<string | null>(null);
+  const [showRateLimitUpsell, setShowRateLimitUpsell] = useState(false);
   const { entitlements, error, refetch } = useEntitlements();
 
   const userId = entitlements?.user?.id;
@@ -82,9 +84,18 @@ export function InteractivityOverlay({ videoId }: InteractivityOverlayProps) {
           setConnectedCount((msg.payload as { connectedCount: number }).connectedCount);
         }
         break;
-      case "error":
-        setNotice((msg.payload as { message?: string }).message ?? "Interaction unavailable");
+      case "error": {
+        const errorMsg = (msg.payload as { message?: string }).message ?? "Interaction unavailable";
+        setNotice(errorMsg);
+        // Show rate limit upsell modal if free user hits rate limit
+        if (
+          currentTier === "free" &&
+          errorMsg.toLowerCase().includes("rate")
+        ) {
+          setShowRateLimitUpsell(true);
+        }
         break;
+      }
     }
   }, []);
 
@@ -205,6 +216,12 @@ export function InteractivityOverlay({ videoId }: InteractivityOverlayProps) {
           />
         )}
       </div>
+
+      {/* Chat rate limit upsell modal */}
+      <ChatRateLimitUpsell
+        isOpen={showRateLimitUpsell}
+        currentTier={currentTier}
+      />
     </div>
   );
 }
