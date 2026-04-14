@@ -252,9 +252,51 @@ export class PayoutEngine {
    * Handle Stripe transfer webhook events
    * (charge.transferred, transfer.paid, transfer.failed)
    */
-  async handleTransferWebhookEvent(_event: Stripe.Event): Promise<void> {
-    // TODO: Parse transfer event from Stripe
-    // Update payout_runs.transfer_status and related fields
+  async handleTransferWebhookEvent(event: Stripe.Event): Promise<void> {
+    try {
+      const { payoutRuns } = await import("@nichestream/db");
+      const { eq } = await import("drizzle-orm");
+
+      // Parse event type and get transfer details
+      let transferId: string | undefined;
+      let transferStatus: string | undefined;
+
+      const eventType = event.type as string;
+      const eventData = event.data.object as any;
+
+      if (eventType === "transfer.paid") {
+        transferId = eventData.id;
+        transferStatus = "paid";
+      } else if (eventType === "transfer.failed") {
+        transferId = eventData.id;
+        transferStatus = "failed";
+      } else if (eventType === "charge.transferred") {
+        if (eventData.transfer) {
+          transferId = typeof eventData.transfer === "string" ? eventData.transfer : eventData.transfer.id;
+          transferStatus = "pending";
+        }
+      }
+
+      if (!transferId) {
+        console.warn(`Unknown or missing transfer in webhook event ${eventType}`);
+        return;
+      }
+
+      // Update payout_runs table with transfer status
+      await this._db
+        .update(payoutRuns)
+        .set({
+          transferStatus: transferStatus as any,
+          updatedAt: new Date(),
+          ...(transferStatus === "paid" && { paidAt: new Date() }),
+        })
+        .where(eq(payoutRuns.stripeTransferId, transferId));
+
+      console.log(`Updated payout transfer ${transferId} to status: ${transferStatus}`);
+    } catch (error) {
+      console.error("Error handling transfer webhook:", error);
+      throw error;
+    }
   }
 }
 

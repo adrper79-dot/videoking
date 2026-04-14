@@ -64,13 +64,13 @@ export class StripeConnectOAuth {
    * - Set user's stripe_account_id
    */
   async handleCallback(
-    _code: string,
+    code: string,
     state: string,
-    _db: ReturnType<typeof createDb>
+    db: ReturnType<typeof createDb>
   ): Promise<{ success: boolean; stripe_account_id?: string; error?: string }> {
     try {
       // Parse state to get user_id
-      const _userId: string = (() => {
+      const userId: string = (() => {
         try {
           const stateData = JSON.parse(decodeURIComponent(state));
           return stateData.user_id;
@@ -80,23 +80,59 @@ export class StripeConnectOAuth {
       })();
 
       // Exchange authorization code for connected account
-      // Note: This uses Stripe's OAuth token exchange
-      // In production, call Stripe backend API:
-      // POST https://connect.stripe.com/oauth/token
-      // with: { client_id, code, scope }
+      // Call Stripe OAuth token endpoint
+      const tokenResponse = await fetch("https://connect.stripe.com/oauth/token", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: new URLSearchParams({
+          client_id: this.env.STRIPE_CONNECT_CLIENT_ID || "",
+          code,
+          scope: "read_write",
+          grant_type: "authorization_code",
+        }).toString(),
+      });
 
-      // TODO: Implement OAuth token exchange
-      // For now, return placeholder
-      const stripeAccountId = "acct_test_placeholder";
+      if (!tokenResponse.ok) {
+        const errorData = await tokenResponse.json();
+        console.error("Stripe OAuth error:", errorData);
+        return { success: false, error: "Stripe authorization failed" };
+      }
 
-      // TODO: Store in database
-      // await db.insert(connectedAccounts).values({
-      //   user_id: userId,
-      //   stripe_account_id: stripeAccountId,
-      //   charges_enabled: false, // Will update after verification
-      //   payouts_enabled: false, // Will update after verification
-      //   onboarding_complete: true,
-      // });
+      const tokenData = (await tokenResponse.json()) as {
+        stripe_user_id?: string;
+        access_token?: string;
+        stripe_publishable_key?: string;
+      };
+      const stripeAccountId = tokenData.stripe_user_id;
+
+      if (!stripeAccountId) {
+        return { success: false, error: "No stripe_user_id in response" };
+      }
+
+      // Store in database
+      const { connectedAccounts } = await import("@nichestream/db");
+      const { eq } = await import("drizzle-orm");
+
+      await db
+        .insert(connectedAccounts)
+        .values({
+          userId,
+          stripeAccountId,
+          chargesEnabled: false,
+          payoutsEnabled: false,
+          onboardingComplete: true,
+        })
+        .onConflictDoUpdate({
+          target: connectedAccounts.userId,
+          set: {
+            stripeAccountId,
+            chargesEnabled: false,
+            payoutsEnabled: false,
+            updatedAt: new Date(),
+          },
+        });
 
       return {
         success: true,
@@ -114,18 +150,23 @@ export class StripeConnectOAuth {
    * 
    * Used to verify creator can receive payouts
    */
-  async getAccountStatus(_stripeAccountId: string): Promise<{
+  async getAccountStatus(stripeAccountId: string): Promise<{
     charges_enabled: boolean;
     payouts_enabled: boolean;
     requirements_due_by?: string;
   }> {
     try {
-      // TODO: Call Stripe API to get account details
-      // const account = await this._stripe.account.retrieve(_stripeAccountId);
+      // Call Stripe API to get account details using connected account token
+      const account = await this._stripe.accounts.retrieve(stripeAccountId, {
+        stripeAccount: stripeAccountId,
+      } as any);
 
       return {
-        charges_enabled: false,
-        payouts_enabled: false,
+        charges_enabled: account.charges_enabled ?? false,
+        payouts_enabled: account.payouts_enabled ?? false,
+        requirements_due_by: account.requirements?.current_deadline
+          ? new Date(account.requirements.current_deadline * 1000).toISOString()
+          : undefined,
       };
     } catch (error) {
       console.error("Error fetching account status:", error);
@@ -137,10 +178,18 @@ export class StripeConnectOAuth {
    * Disconnect creator's Stripe account
    * (for when creator wants to disconnect)
    */
-  async disconnectAccount(userId: string, _db: ReturnType<typeof createDb>): Promise<void> {
-    // TODO: Delete from connected_accounts table
-    // Update user to remove stripe_account_id
-    console.log(`Disconnected Stripe account for user ${userId}`);
+  async disconnectAccount(userId: string, db: ReturnType<typeof createDb>): Promise<void> {
+    try {
+      // Delete from connected_accounts table
+      const { connectedAccounts } = await import("@nichestream/db");
+      const { eq } = await import("drizzle-orm");
+
+      await db.delete(connectedAccounts).where(eq(connectedAccounts.userId, userId));
+      console.log(`Disconnected Stripe account for user ${userId}`);
+    } catch (error) {
+      console.error("Error disconnecting account:", error);
+      throw error;
+    }
   }
 }
 
@@ -223,8 +272,17 @@ export async function handleStatus(c: Context<{ Bindings: Env }>): Promise<Respo
       return c.json({ error: "Unauthorized" }, 401);
     }
 
-    // TODO: Query connected_accounts table for this user
-    const stripeAccountId = ""; // Retrieved from DB
+    // Query connected_accounts table for this user
+    const { connectedAccounts } = await import("@nichestream/db");
+    const { eq } = await import("drizzle-orm");
+
+    const [account] = await _db
+      .select()
+      .from(connectedAccounts)
+      .where(eq(connectedAccounts.userId, session.user.id))
+      .limit(1);
+
+    const stripeAccountId = account?.stripeAccountId;
 
     if (!stripeAccountId) {
       return c.json({

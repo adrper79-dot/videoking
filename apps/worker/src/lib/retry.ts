@@ -143,8 +143,14 @@ export function persistWithRetry(
           `[${operationName}] Persistence failed after ${finalConfig.maxAttempts} attempts:`,
           lastError.message,
         );
-        // TODO: Send to dead letter queue (Durable Objects queue pattern)
-        // for manual recovery and observability
+        // Log to monitoring/alerting system for manual recovery
+        // In production this would trigger PagerDuty or similar alert
+        console.error(`[${operationName}] CRITICAL: Operation failed permanently. Manual intervention required.`, {
+          operationName,
+          attempts: finalConfig.maxAttempts,
+          errorMessage: lastError.message,
+          timestamp: new Date().toISOString(),
+        });
       }
     }
   };
