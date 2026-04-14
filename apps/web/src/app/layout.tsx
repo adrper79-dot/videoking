@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { Navbar } from "@/components/Navbar";
+import { NotificationBanner } from "@/components/NotificationBanner";
 import { EntitlementsProvider } from "@/components/EntitlementsContext";
 
 export const metadata: Metadata = {
@@ -39,6 +40,7 @@ export default function RootLayout({
       <body className="min-h-screen bg-[#0f0f0f] text-neutral-100 antialiased">
         <EntitlementsProvider>
           <Navbar />
+          <NotificationBanner />
           <main className="pt-16">{children}</main>
         </EntitlementsProvider>
       </body>

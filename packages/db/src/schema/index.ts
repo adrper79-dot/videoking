@@ -14,6 +14,7 @@ export * from "./assets";
 export * from "./ads";
 // Phase 4: Creator payouts, referrals, analytics
 export * from "./referrals";
+export * from "./notifications";
 
 // ─── Drizzle Relations (defined here to avoid circular imports) ───────────────
 import { relations } from "drizzle-orm";
@@ -25,6 +26,7 @@ import { chatMessages, polls, pollVotes, videoUnlocks } from "./interactions";
 import { playlists, playlistVideos } from "./playlists";
 import { moderationReports } from "./moderation";
 import { referrals, churnTracking, payoutRuns, cohortTracking } from "./referrals";
+import { notifications } from "./notifications";
 
 export const usersRelations = relations(users, ({ many }) => ({
   videos: many(videos),
@@ -39,6 +41,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   referralsSent: many(referrals, { relationName: "referredBy" }),
   referralsReceived: many(referrals, { relationName: "referred" }),
   cohortTracking: many(cohortTracking),
+  notifications: many(notifications),
 }));
 
 export const videosRelations = relations(videos, ({ one, many }) => ({

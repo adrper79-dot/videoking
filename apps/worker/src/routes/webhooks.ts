@@ -109,6 +109,35 @@ webhooksRouter.post("/stripe", async (c) => {
         break;
       }
 
+      case "customer.subscription.trial_will_end": {
+        const sub = event.data.object as Stripe.Subscription;
+        // Find the subscriber user to send trial ending notification
+        const [subRecord] = await db
+          .select({ subscriberId: subscriptions.subscriberId })
+          .from(subscriptions)
+          .where(eq(subscriptions.stripeSubscriptionId, sub.id))
+          .limit(1);
+
+        if (subRecord?.subscriberId) {
+          const { notifications } = await import("@nichestream/db");
+          // Create trial ending soon notification (expires in 7 days)
+          const expiresAt = new Date();
+          expiresAt.setDate(expiresAt.getDate() + 7);
+
+          await db.insert(notifications).values({
+            userId: subRecord.subscriberId,
+            type: "trial_ending_soon",
+            title: "Your trial ends soon",
+            message: "Your 14-day free trial ends in 3 days. Keep access to unlimited chat and exclusive content for just $1/month.",
+            ctaUrl: "/pricing?offer=trial_urgency",
+            ctaLabel: "Subscribe Now",
+            priority: 2, // Urgent
+            expiresAt,
+          });
+        }
+        break;
+      }
+
       default:
         break;
     }
