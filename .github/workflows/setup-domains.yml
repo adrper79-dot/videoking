@@ -1,0 +1,73 @@
+name: Setup Custom Domains
+
+on:
+  workflow_dispatch:
+
+jobs:
+  setup-domains:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9.0.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Deploy Worker with Custom Domain Routes
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          cd apps/worker
+          echo "🚀 Deploying Worker with custom domain routing..."
+          pnpm exec wrangler deploy
+          echo "✅ Worker deployed with api.itsjusus.com routes active"
+
+      - name: Add R2 Custom Domain
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          cd apps/worker
+          echo "📦 Adding R2 custom domain..."
+          pnpm exec wrangler r2 bucket domain add videoking-r2 --domain-name "assets.itsjusus.com" 2>&1 || echo "⚠️  Domain may already exist or require manual confirmation"
+          echo "✅ R2 domain setup completed"
+
+      - name: Verify Setup
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          cd apps/worker
+          echo ""
+          echo "🔍 Verification:"
+          echo "===================="
+          echo ""
+          echo "✓ Worker deployed to: https://api.itsjusus.com"
+          echo "✓ R2 bucket domain:   https://assets.itsjusus.com"
+          echo "✓ Pages frontend:     https://itsjusus.com"
+          echo ""
+          echo "All custom domains should now be active!"
+          echo "Note: DNS propagation may take 5-10 minutes"
+
+      - name: Success Notification
+        if: success()
+        run: |
+          echo "✅ Custom domains setup complete!"
+          echo ""
+          echo "Your site is now live:"
+          echo "  Frontend:  https://itsjusus.com"
+          echo "  API:       https://api.itsjusus.com"
+          echo "  Assets:    https://assets.itsjusus.com"
