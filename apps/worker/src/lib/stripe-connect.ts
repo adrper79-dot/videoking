@@ -1,0 +1,247 @@
+/**
+ * Stripe Connect OAuth Handler
+ * 
+ * Manages the OAuth flow for creator Stripe Connect Express accounts.
+ * 
+ * Flow:
+ * 1. Creator clicks "Connect Bank Account" in dashboard
+ * 2. Redirects to /api/stripe/connect/authorize
+ * 3. This handler redirects to Stripe's OAuth authorize endpoint
+ * 4. Creator grants access
+ * 5. Stripe redirects to /api/stripe/connect/callback with authorization code
+ * 6. Exchange code for connected account ID and store in DB
+ * 7. Redirect to dashboard with success message
+ */
+
+import type { Context } from "hono";
+import Stripe from "stripe";
+import { createDb } from "@nichestream/db";
+import { createAuth } from "./auth";
+import type { Env } from "../types";
+
+export class StripeConnectOAuth {
+  private stripe: Stripe;
+  private env: Env;
+
+  constructor(stripeSecretKey: string, env: Env) {
+    this.stripe = new Stripe(stripeSecretKey);
+    this.env = env;
+  }
+
+  /**
+   * Generate Stripe Connect OAuth authorization URL
+   * Creator redirects to this URL to grant access
+   * 
+   * Returns: Full authorization URL
+   */
+  generateAuthUrl(userId: string): string {
+    const params = new URLSearchParams({
+      client_id: this.stripe.client_id || "",
+      state: encodeURIComponent(JSON.stringify({ user_id: userId })),
+      stripe_user: JSON.stringify({
+        business_type: "individual",
+        url: `${this.env.APP_BASE_URL}/channel/${userId}`, // Creator's channel URL
+        support_phone: "", // Optional: for support contact
+        product_category: "media",
+      }),
+      scope: "read_write",
+      suggested_capabilities: "transfers",
+    });
+
+    return `https://connect.stripe.com/oauth/authorize?${params.toString()}`;
+  }
+
+  /**
+   * Handle Stripe OAuth callback
+   * Exchange authorization code for connected account ID
+   * 
+   * Request params:
+   * - code: authorization code from Stripe
+   * - state: user_id encoded in auth URL
+   * 
+   * Side effects:
+   * - Insert/update connected_accounts record
+   * - Set user's stripe_account_id
+   */
+  async handleCallback(
+    code: string,
+    state: string,
+    db: ReturnType<typeof createDb>
+  ): Promise<{ success: boolean; stripe_account_id?: string; error?: string }> {
+    try {
+      // Parse state to get user_id
+      let userId: string;
+      try {
+        const stateData = JSON.parse(decodeURIComponent(state));
+        userId = stateData.user_id;
+      } catch (e) {
+        return { success: false, error: "Invalid state parameter" };
+      }
+
+      // Exchange authorization code for connected account
+      // Note: This uses Stripe's OAuth token exchange
+      // In production, call Stripe backend API:
+      // POST https://connect.stripe.com/oauth/token
+      // with: { client_id, code, scope }
+
+      // TODO: Implement OAuth token exchange
+      // For now, return placeholder
+      const stripeAccountId = "acct_test_placeholder";
+
+      // TODO: Store in database
+      // await db.insert(connectedAccounts).values({
+      //   user_id: userId,
+      //   stripe_account_id: stripeAccountId,
+      //   charges_enabled: false, // Will update after verification
+      //   payouts_enabled: false, // Will update after verification
+      //   onboarding_complete: true,
+      // });
+
+      return {
+        success: true,
+        stripe_account_id: stripeAccountId,
+      };
+    } catch (error) {
+      console.error("OAuth callback error:", error);
+      return { success: false, error: "Failed to complete authorization" };
+    }
+  }
+
+  /**
+   * Check connected account status
+   * Returns activation status: charges_enabled, payouts_enabled
+   * 
+   * Used to verify creator can receive payouts
+   */
+  async getAccountStatus(stripeAccountId: string): Promise<{
+    charges_enabled: boolean;
+    payouts_enabled: boolean;
+    requirements_due_by?: string;
+  }> {
+    try {
+      // TODO: Call Stripe API to get account details
+      // const account = await this.stripe.account.retrieve(stripeAccountId);
+
+      return {
+        charges_enabled: false,
+        payouts_enabled: false,
+      };
+    } catch (error) {
+      console.error("Error fetching account status:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Disconnect creator's Stripe account
+   * (for when creator wants to disconnect)
+   */
+  async disconnectAccount(userId: string, db: ReturnType<typeof createDb>): Promise<void> {
+    // TODO: Delete from connected_accounts table
+    // Update user to remove stripe_account_id
+    console.log(`Disconnected Stripe account for user ${userId}`);
+  }
+}
+
+/**
+ * Handler for GET /api/stripe/connect/authorize
+ * Redirects creator to Stripe OAuth authorization page
+ */
+export async function handleAuthorize(c: Context<{ Bindings: Env }>): Promise<Response> {
+  try {
+    const db = createDb(c.env);
+    const auth = createAuth(db, c.env);
+    const session = await auth.api.getSession(c);
+
+    if (!session) {
+      return c.json({ error: "Unauthorized" }, 401);
+    }
+
+    const userId = session.user.id;
+    const oauth = new StripeConnectOAuth(c.env.STRIPE_SECRET_KEY, c.env);
+
+    const authUrl = oauth.generateAuthUrl(userId);
+    return c.redirect(authUrl);
+  } catch (error) {
+    console.error("Error in authorize handler:", error);
+    return c.json({ error: "Failed to initiate Stripe Connect" }, 500);
+  }
+}
+
+/**
+ * Handler for GET /api/stripe/connect/callback
+ * Processes Stripe OAuth callback and stores connected account
+ */
+export async function handleCallback(c: Context<{ Bindings: Env }>): Promise<Response> {
+  try {
+    const code = c.req.query("code");
+    const state = c.req.query("state");
+    const error = c.req.query("error");
+
+    if (error) {
+      return c.redirect(
+        `${c.env.APP_BASE_URL}/dashboard?error=stripe_connect_denied&error_description=${error}`
+      );
+    }
+
+    if (!code || !state) {
+      return c.json({ error: "Missing code or state" }, 400);
+    }
+
+    const db = createDb(c.env);
+    const oauth = new StripeConnectOAuth(c.env.STRIPE_SECRET_KEY, c.env);
+
+    const result = await oauth.handleCallback(code, state, db);
+
+    if (result.success) {
+      return c.redirect(
+        `${c.env.APP_BASE_URL}/dashboard?connected=true&account_id=${result.stripe_account_id}`
+      );
+    } else {
+      return c.redirect(
+        `${c.env.APP_BASE_URL}/dashboard?error=stripe_connect_failed&error_description=${result.error}`
+      );
+    }
+  } catch (error) {
+    console.error("Error in callback handler:", error);
+    return c.redirect(`${c.env.APP_BASE_URL}/dashboard?error=stripe_connect_error`);
+  }
+}
+
+/**
+ * Handler for GET /api/stripe/connect/status
+ * Check current connected account status
+ */
+export async function handleStatus(c: Context<{ Bindings: Env }>): Promise<Response> {
+  try {
+    const db = createDb(c.env);
+    const auth = createAuth(db, c.env);
+    const session = await auth.api.getSession(c);
+
+    if (!session) {
+      return c.json({ error: "Unauthorized" }, 401);
+    }
+
+    // TODO: Query connected_accounts table for this user
+    const stripeAccountId = ""; // Retrieved from DB
+
+    if (!stripeAccountId) {
+      return c.json({
+        connected: false,
+        message: "No connected Stripe account",
+      });
+    }
+
+    const oauth = new StripeConnectOAuth(c.env.STRIPE_SECRET_KEY, c.env);
+    const status = await oauth.getAccountStatus(stripeAccountId);
+
+    return c.json({
+      connected: true,
+      stripe_account_id: stripeAccountId,
+      ...status,
+    });
+  } catch (error) {
+    console.error("Error fetching status:", error);
+    return c.json({ error: "Failed to fetch account status" }, 500);
+  }
+}
