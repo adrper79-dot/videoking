@@ -6,6 +6,8 @@
     "build": "turbo run build",
     "dev": "turbo run dev",
     "typecheck": "turbo run typecheck",
+    "test": "node test/phase2-api.test.ts && node test/phase2-components.test.ts",
+    "test:verbose": "node test/phase2-api.test.ts --verbose && node test/phase2-components.test.ts --verbose",
     "db:generate": "turbo run db:generate",
     "db:migrate": "turbo run db:migrate"
   },
