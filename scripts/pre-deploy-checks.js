@@ -202,17 +202,65 @@ try {
 }
 console.log();
 
-// ====== Summary ======
-console.log("━".repeat(60));
-if (errors.length === 0 && warnings.length === 0) {
-  console.log("✅ All pre-deployment checks passed!");
-  process.exit(0);
-} else if (errors.length === 0) {
-  console.log(`⚠️  ${warnings.length} warning(s) - safe to deploy`);
-  process.exit(0);
-} else {
-  console.log(`❌ ${errors.length} error(s) found - DO NOT DEPLOY`);
-  console.log("\nFix these issues:");
-  errors.forEach((err, i) => console.log(`  ${i + 1}. ${err}`));
-  process.exit(1);
+// ====== 7. DNS Verification (Optional - requires network) ======
+console.log("7️⃣  DNS Resolution (Optional - Network Check)");
+import("dns").then(async (dnsModule) => {
+  try {
+    const dns = dnsModule;
+    const lookup = (hostname) => new Promise((resolve) => {
+      dns.lookup(hostname, (err, address) => {
+        if (err) {
+          resolve({ error: err, address: null });
+        } else {
+          resolve({ error: null, address });
+        }
+      });
+    });
+
+    // Try to resolve api.itsjusus.com
+    const apiResult = await lookup("api.itsjusus.com");
+    if (apiResult.error && apiResult.error.code === "ENOTFOUND") {
+      warn(
+        `api.itsjusus.com does not resolve\n       See: docs/DNS_RESOLUTION_FIX.md`
+      );
+    } else if (apiResult.error) {
+      warn(`DNS check failed (network may be unavailable): ${apiResult.error.message}`);
+    } else {
+      success(`api.itsjusus.com resolves to: ${apiResult.address}`);
+    }
+
+    // Check Cloudflare Pages domain
+    const pagesResult = await lookup("itsjusus.com");
+    if (pagesResult.error) {
+      error(`itsjusus.com does not resolve: ${pagesResult.error.message}`);
+    } else {
+      success(`itsjusus.com resolves to: ${pagesResult.address}`);
+    }
+
+    // Print summary after DNS checks complete
+    printSummary();
+  } catch (e) {
+    warn(`DNS check unavailable: ${e.message}`);
+    printSummary();
+  }
+}).catch((e) => {
+  warn(`DNS check unavailable: ${e.message}`);
+  printSummary();
+});
+
+function printSummary() {
+  console.log();
+  console.log("━".repeat(60));
+  if (errors.length === 0 && warnings.length === 0) {
+    console.log("✅ All pre-deployment checks passed!");
+    process.exit(0);
+  } else if (errors.length === 0) {
+    console.log(`⚠️  ${warnings.length} warning(s) - safe to deploy`);
+    process.exit(0);
+  } else {
+    console.log(`❌ ${errors.length} error(s) found - DO NOT DEPLOY`);
+    console.log("\nFix these issues:");
+    errors.forEach((err, i) => console.log(`  ${i + 1}. ${err}`));
+    process.exit(1);
+  }
 }
