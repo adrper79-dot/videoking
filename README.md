@@ -19,6 +19,19 @@ A **hyper-niche interactive video platform** built on the Cloudflare edge stack.
 
 ---
 
+## 📚 Documentation
+
+| Resource | Purpose |
+|---|---|
+| [LOCAL_DEVELOPMENT_SETUP.md](docs/LOCAL_DEVELOPMENT_SETUP.md) | Complete dev environment setup guide |
+| [PHASE_3_DEPLOYMENT_READY.md](docs/PHASE_3_DEPLOYMENT_READY.md) | Production deployment guide |
+| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | System design and component overview |
+| [ENGINEERING.md](docs/ENGINEERING.md) | Code conventions and patterns |
+| [improvement-tracker.md](docs/improvement-tracker.md) | Feature status (42/49 issues complete) |
+| [COMPREHENSIVE_AUDIT_REPORT.md](docs/COMPREHENSIVE_AUDIT_REPORT.md) | Technical audit and code review |
+
+---
+
 ## Project Structure
 
 ```
@@ -51,88 +64,96 @@ nichestream/
 
 ## Getting Started
 
+For complete setup instructions, see [**LOCAL_DEVELOPMENT_SETUP.md**](docs/LOCAL_DEVELOPMENT_SETUP.md).
+
+### Quick Start (5 minutes)
+
+1. **Install dependencies:**
+   ```bash
+   pnpm install
+   ```
+
+2. **Set up environment files:**
+   ```bash
+   # Worker environment (all Stripe/Stream/Auth credentials)
+   cp apps/worker/.dev.vars.example apps/worker/.dev.vars
+   
+   # Web environment (API URLs)
+   cp apps/web/.env.local.example apps/web/.env.local
+   ```
+
+3. **Initialize database:**
+   ```bash
+   cd packages/db
+   pnpm db:generate    # Generate migrations
+   pnpm db:migrate     # Run migrations (needs local PostgreSQL)
+   cd ../..
+   ```
+
+4. **Start development servers** (multiple terminals):
+   ```bash
+   # Terminal 1: Worker API
+   cd apps/worker && pnpm dev
+   # → http://localhost:8787
+   
+   # Terminal 2: Web Frontend
+   cd apps/web && pnpm dev
+   # → http://localhost:3000
+   ```
+
 ### Prerequisites
 
-- Node.js 20+
-- pnpm 9+
-- A Cloudflare account with Workers & Pages, Stream, R2, and Hyperdrive configured
-- A Stripe account with Connect enabled
-- A Neon PostgreSQL database
+- **Node.js:** 18+ 
+- **pnpm:** 9.0.0+
+- **PostgreSQL:** 14+ (local or Docker)
+- **Cloudflare Account:** For deploying (optional for local dev)
+- **Stripe Account:** Test mode credentials for payment testing
 
-### 1. Install dependencies
+### Detailed Setup
 
-```bash
-pnpm install
-```
-
-### 2. Configure environment variables
-
-**Worker** (`apps/worker/.dev.vars`):
-```
-BETTER_AUTH_SECRET=your-secret-here
-STREAM_API_TOKEN=your-stream-token
-STREAM_ACCOUNT_ID=your-cf-account-id
-# Stream customer subdomain (Settings → Customer Domain in Cloudflare Stream dashboard)
-# e.g. if your URLs are customer-abc123.cloudflarestream.com, set STREAM_CUSTOMER_DOMAIN=abc123
-STREAM_CUSTOMER_DOMAIN=abc123
-STRIPE_SECRET_KEY=sk_test_...
-STRIPE_WEBHOOK_SECRET=whsec_...
-APP_BASE_URL=http://localhost:3000
-PLATFORM_FEE_PERCENT=20
-STRIPE_CITIZEN_MONTHLY_PRICE=price_monthly_...
-STRIPE_CITIZEN_ANNUAL_PRICE=price_annual_...
-STRIPE_VIP_MONTHLY_PRICE=price_vip_...
-CHAT_RATE_LIMIT_FREE_MS=10000
-CHAT_RATE_LIMIT_CITIZEN_MS=1000
-CHAT_RATE_LIMIT_VIP_MS=500
-TRIAL_PERIOD_DAYS=14
-```
-
-**Web** (`apps/web/.env.local`):
-```
-NEXT_PUBLIC_API_URL=http://localhost:8787
-NEXT_PUBLIC_APP_URL=http://localhost:3000
-# Stripe Price ID for the monthly subscription plan (create in Stripe dashboard)
-NEXT_PUBLIC_SUBSCRIPTION_PRICE_MONTHLY=price_...
-NEXT_PUBLIC_SUBSCRIPTION_PRICE_ANNUAL=price_...
-```
-
-### 3. Set up the database
-
-```bash
-pnpm db:generate
-DATABASE_URL=postgres://... pnpm db:migrate
-```
-
-### 4. Update wrangler.toml
-
-Edit `apps/worker/wrangler.toml` and replace:
-- `YOUR_HYPERDRIVE_ID` with your actual Hyperdrive binding ID (Cloudflare dashboard → Workers & Pages → Hyperdrive → create config → copy ID)
-- `STREAM_ACCOUNT_ID` with your Cloudflare account ID
-- `STREAM_CUSTOMER_DOMAIN` with the subdomain shown in Cloudflare Stream → Settings → Customer Domain
-
-### 5. Run locally
-
-```bash
-pnpm dev
-```
-
-- Web: http://localhost:3000
-- Worker: http://localhost:8787
+See [docs/LOCAL_DEVELOPMENT_SETUP.md](docs/LOCAL_DEVELOPMENT_SETUP.md) for:
+- Docker PostgreSQL setup
+- All environment variables explained with sources
+- Troubleshooting common issues
+- Complete command reference
 
 ---
 
 ## Deployment
 
-### Worker
+For complete deployment instructions, see [**docs/PHASE_3_DEPLOYMENT_READY.md**](docs/PHASE_3_DEPLOYMENT_READY.md).
+
+### Quick Deploy
+
 ```bash
-cd apps/worker && pnpm deploy
+# 1. Authenticate with Cloudflare
+cd apps/worker && pnpm exec wrangler login
+
+# 2. Set secrets (interactive)
+pnpm exec wrangler secret put BETTER_AUTH_SECRET
+pnpm exec wrangler secret put STRIPE_SECRET_KEY
+pnpm exec wrangler secret put STRIPE_WEBHOOK_SECRET
+
+# 3. Deploy Worker API
+pnpm exec wrangler deploy
+
+# 4. Deploy Web Frontend
+cd ../web
+pnpm build:pages
+pnpm exec wrangler pages deploy dist
+
+# 5. Verify
+curl https://your-worker.*.workers.dev/health
 ```
 
-### Web (Cloudflare Pages)
-```bash
-cd apps/web && pnpm build && pnpm deploy
-```
+### Environment Setup
+
+Before deploying, configure:
+- Secrets: `wrangler secret put KEY VALUE`
+- Config vars: Set in `wrangler.toml` or via dashboard
+- Database: Neon PostgreSQL with Hyperdrive binding
+- Stripe: Connected account with pricing configured
+- Stream: Customers domain configured
 
 ---
 
