@@ -66,7 +66,6 @@ const requiredFiles = [
   "apps/web/public/favicon.ico",
   "apps/web/public/icon-192.png",
   "apps/web/public/icon-512.png",
-  "apps/web/public/_routes.json",
 ];
 
 requiredFiles.forEach((file) => {
