@@ -1,4 +1,4 @@
-import { boolean, jsonb, pgEnum, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { boolean, integer, jsonb, pgEnum, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 
 export const userRoleEnum = pgEnum("user_role", ["viewer", "creator", "admin"]);
 export const userTierEnum = pgEnum("user_tier", ["free", "citizen", "vip"]);
@@ -31,5 +31,8 @@ export const users = pgTable("users", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   // Phase 2: BlerdArt niche features
   blerdartVerified: boolean("blerdart_verified").notNull().default(false),
+  // Phase 4: Referral program and trial extensions
+  accountCreditsCents: integer("account_credits_cents").notNull().default(0),
+  trialExtendedDays: integer("trial_extended_days").notNull().default(0),
 });
 

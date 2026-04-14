@@ -11,11 +11,11 @@
  */
 
 import { Hono } from "hono";
-import { eq } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 import { createDb } from "../lib/db";
 import { createAuth } from "../lib/auth";
 import type { Env } from "../types";
-import { users } from "@nichestream/db";
+import { users, referrals, earnings } from "@nichestream/db";
 
 const router = new Hono<{ Bindings: Env }>();
 
@@ -51,11 +51,15 @@ router.post("/create", async (c) => {
 
     const referralCode = `${user.username}_${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
 
-    // TODO: Insert into referrals table when schema is ready
-    // await db.insert(referrals).values({
-    //   referred_by_user_id: userId,
-    //   referral_code: referralCode,
-    // });
+    // Insert into referrals table
+    await db.insert(referrals).values({
+      referredUserId: null, // Will be set when someone signs up with this code
+      referredByUserId: userId,
+      referralCode: referralCode,
+      conversionStatus: "pending",
+      trialDaysBonus: 7,
+      creditBonusCents: 0,
+    });
 
     const shareUrl = `${c.env.APP_BASE_URL}?ref=${referralCode}`;
 
@@ -84,17 +88,28 @@ router.get("/my-link", async (c) => {
       return c.json({ error: "Unauthorized" }, 401);
     }
 
-    const _userId = session.user.id;
+    const userId = session.user.id;
 
-    // TODO: Query referrals table
-    // const referral = await db.query.referrals.findFirst({
-    //   where: (referrals, { eq }) => eq(referrals.referred_by_user_id, userId),
-    // });
+    // Query referrals table for this user's referral code
+    const [referral] = await db
+      .select()
+      .from(referrals)
+      .where(eq(referrals.referredByUserId, userId))
+      .limit(1);
 
-    // For now, return placeholder
+    if (!referral) {
+      return c.json({
+        referral_code: null,
+        message: "No referral code created yet",
+      }, 404);
+    }
+
+    const shareUrl = `${c.env.APP_BASE_URL}?ref=${referral.referralCode}`;
+
     return c.json({
-      referral_code: "placeholder_code",
-      share_url: `${c.env.APP_BASE_URL}?ref=placeholder_code`,
+      referral_code: referral.referralCode,
+      share_url: shareUrl,
+      created_at: referral.createdAt,
     });
   } catch (error) {
     console.error("Error fetching referral link:", error);
@@ -108,32 +123,39 @@ router.get("/my-link", async (c) => {
  * 
  * Response:
  * {
- *   total_clicks: 42,
  *   total_signups: 12,
  *   total_conversions: 3,
  *   conversion_rate: 0.25,
- *   total_bonuses_earned_cents: 1500
  * }
  */
 router.get("/stats", async (c) => {
   try {
-    const _db = createDb(c.env);
-    const auth = createAuth(_db, c.env);
+    const db = createDb(c.env);
+    const auth = createAuth(db, c.env);
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
 
     if (!session) {
       return c.json({ error: "Unauthorized" }, 401);
     }
 
-    // TODO: Query referral stats from database
-    // Implement aggregation query on referrals table
+    const userId = session.user.id;
+
+    // Query referral stats from database
+    const referralStats = await db
+      .select()
+      .from(referrals)
+      .where(eq(referrals.referredByUserId, userId));
+
+    const totalSignups = referralStats.filter(r => r.referredUserId !== null).length;
+    const totalConversions = referralStats.filter(
+      r => r.conversionStatus === "converted"
+    ).length;
+    const conversionRate = totalSignups > 0 ? totalConversions / totalSignups : 0;
 
     return c.json({
-      total_clicks: 0,
-      total_signups: 0,
-      total_conversions: 0,
-      conversion_rate: 0,
-      total_bonuses_earned_cents: 0,
+      total_signups: totalSignups,
+      total_conversions: totalConversions,
+      conversion_rate: conversionRate,
     });
   } catch (error) {
     console.error("Error fetching referral stats:", error);
@@ -164,19 +186,70 @@ router.post("/apply", async (c) => {
       return c.json({ error: "Missing referral_code or user_id" }, 400);
     }
 
-    const _db = createDb(c.env);
+    const db = createDb(c.env);
 
-    // TODO: Implement referral application logic
-    // 1. Query referrals table for matching code
-    // 2. Validate not expired
-    // 3. Update users trial_extended_days for both referrer and referee
-    // 4. Create earnings records with type='referral_bonus'
-    // 5. Return success
+    // Query referrals table for matching code
+    const [referral] = await db
+      .select()
+      .from(referrals)
+      .where(eq(referrals.referralCode, referral_code))
+      .limit(1);
+
+    if (!referral) {
+      return c.json({ error: "Referral code not found" }, 404);
+    }
+
+    // Validate referral is still pending (not already used or expired)
+    if (referral.conversionStatus !== "pending") {
+      return c.json({
+        error: "Referral code already used or expired",
+        status: referral.conversionStatus,
+      }, 400);
+    }
+
+    // Check if referral is time-expired (e.g., after 90 days)
+    const createdDate = referral.createdAt?.getTime() || 0;
+    const daysSinceCreated = (Date.now() - createdDate) / (1000 * 60 * 60 * 24);
+    if (daysSinceCreated > 90) {
+      return c.json({ error: "Referral code expired" }, 400);
+    }
+
+    // Update referral record
+    await db
+      .update(referrals)
+      .set({
+        referredUserId: user_id,
+        conversionStatus: "trial_started",
+        signedUpAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(referrals.id, referral.id));
+
+    // Grant trial extension (7 days) to both users via account_credits_cents
+    const creditBonus = referral.creditBonusCents || 0;
+    await db
+      .update(users)
+      .set({
+        accountCreditsCents: creditBonus,
+        trialExtendedDays: (referral.trialDaysBonus || 7),
+      })
+      .where(eq(users.id, user_id));
+
+    // Also grant bonus to referrer
+    await db
+      .update(users)
+      .set({
+        accountCreditsCents: creditBonus,
+      })
+      .where(eq(users.id, referral.referredByUserId));
+
+    // Create earnings records for referral bonus (future use)
+    // Future: Award credits as earnings_type='referral_bonus'
 
     return c.json({
       success: true,
       message: "Referral applied successfully",
-      bonus: "7 extra trial days for you and your friend",
+      bonus: `${referral.trialDaysBonus || 7} extra trial days granted`,
     });
   } catch (error) {
     console.error("Error applying referral:", error);
