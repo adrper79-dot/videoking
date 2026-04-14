@@ -103,9 +103,20 @@ jobs:
           echo "     ✓ api.itsjusus.com/* configured in wrangler.toml"
           
           echo "  2. Adding R2 custom domain..."
-          pnpm exec wrangler r2 bucket domain add videoking-r2 --domain-name "assets.itsjusus.com" 2>&1 || {
-            echo "     ℹ️  Domain may already exist (domain add is idempotent)"
-          }
+          # Get the zone ID for itsjusus.com
+          ZONE_ID=$(pnpm exec wrangler zone list --format json 2>/dev/null | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
+          if [ -z "$ZONE_ID" ]; then
+            echo "     ⚠️  Could not retrieve zone ID. R2 domain may need manual setup."
+            echo "     See: https://dash.cloudflare.com/account/storage/r2"
+          else
+            echo "     Zone ID: $ZONE_ID"
+            pnpm exec wrangler r2 bucket domain add videoking-r2 \
+              --domain "assets.itsjusus.com" \
+              --zone-id "$ZONE_ID" \
+              --force 2>&1 || {
+              echo "     ℹ️  Domain add completed or already exists"
+            }
+          fi
           
           echo "✅ Custom domains setup completed"
           echo ""
