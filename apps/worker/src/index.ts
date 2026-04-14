@@ -16,6 +16,7 @@ import adsRouter from "./routes/ads";
 import referralsRouter from "./routes/referrals";
 import analyticsRouter from "./routes/analytics";
 import { notificationRoutes } from "./routes/notifications";
+import { emailRoutes } from "./routes/email";
 import { VideoRoom } from "./durable-objects/VideoRoom";
 import { UserPresence } from "./durable-objects/UserPresence";
 import { createDb } from "./lib/db";
@@ -118,6 +119,11 @@ app.route("/api/admin/analytics", analyticsRouter);
 // ─── Notifications Routes (Phase 4) ────────────────────────────────────────────
 
 app.route("/api/notifications", notificationRoutes);
+
+// ─── Email Routes (Phase 4) ────────────────────────────────────────────────────
+
+app.route("/api/email", emailRoutes);
+
 // ─── WebSocket: upgrade to VideoRoom Durable Object ──────────────────────────
 
 /**

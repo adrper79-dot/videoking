@@ -1,0 +1,1 @@
+ALTER TABLE "users" ADD COLUMN "email_preferences" jsonb DEFAULT '{"trial_alerts":true,"new_videos":true,"watch_party_invites":true,"payout_milestones":true,"referral_bonuses":true,"community_updates":false}'::jsonb NOT NULL;

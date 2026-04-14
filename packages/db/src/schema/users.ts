@@ -34,5 +34,23 @@ export const users = pgTable("users", {
   // Phase 4: Referral program and trial extensions
   accountCreditsCents: integer("account_credits_cents").notNull().default(0),
   trialExtendedDays: integer("trial_extended_days").notNull().default(0),
+  // Phase 4: Email notification preferences
+  emailPreferences: jsonb("email_preferences")
+    .$type<{
+      trial_alerts: boolean;
+      new_videos: boolean;
+      watch_party_invites: boolean;
+      payout_milestones: boolean;
+      referral_bonuses: boolean;
+      community_updates: boolean;
+    }>()
+    .notNull()
+    .default({
+      trial_alerts: true,
+      new_videos: true,
+      watch_party_invites: true,
+      payout_milestones: true,
+      referral_bonuses: true,
+      community_updates: false,
+    }),
 });
-
