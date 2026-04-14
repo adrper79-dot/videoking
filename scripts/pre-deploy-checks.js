@@ -80,40 +80,13 @@ requiredFiles.forEach((file) => {
 });
 console.log();
 
-// ====== 3. Check manifest.json ======
-console.log("3️⃣  Manifest.json Validation");
-const manifestPath = path.join(webDir, "public", "manifest.json");
-try {
-  const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
-
-  // Check required fields
-  const requiredFields = ["name", "short_name", "description", "start_url"];
-  requiredFields.forEach((field) => {
-    if (manifest[field]) {
-      success(`manifest.${field}: ${manifest[field]}`);
-    } else {
-      error(`manifest.json missing required field: ${field}`);
-    }
-  });
-
-  // Check icons reference in manifest
-  if (manifest.icons && manifest.icons.length > 0) {
-    success(`${manifest.icons.length} icons defined in manifest`);
-    manifest.icons.forEach((icon, i) => {
-      if (icon.src) {
-        const iconPath = path.join(webDir, "public", icon.src);
-        if (fs.existsSync(iconPath)) {
-          success(`  Icon ${i + 1}: ${icon.src} exists`);
-        } else {
-          error(`  Icon ${i + 1}: ${icon.src} NOT FOUND`);
-        }
-      }
-    });
-  } else {
-    warn("No icons defined in manifest");
-  }
-} catch (e) {
-  error(`Invalid manifest.json: ${e.message}`);
+// ====== 3. Check Next.js Manifest Route ======
+console.log("3️⃣  Manifest.json Dynamic Route");
+const manifestRoutePath = path.join(webDir, "src", "app", "manifest.route.ts");
+if (fs.existsSync(manifestRoutePath)) {
+  success("manifest.route.ts (Next.js dynamic manifest generation)");
+} else {
+  error("Missing: apps/web/src/app/manifest.route.ts");
 }
 console.log();
 
