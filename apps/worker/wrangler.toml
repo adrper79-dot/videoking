@@ -16,6 +16,8 @@ tag = "v1"
 new_classes = ["VideoRoom", "UserPresence"]
 
 # Hyperdrive binding for low-latency access to Neon Postgres.
+# For local development, set WRANGLER_HYPERDRIVE_LOCAL_CONNECTION_STRING_DB env var
+# to your local Postgres connection string (e.g., postgresql://user:pass@localhost/dbname)
 [[hyperdrive]]
 binding = "DB"
 id = "72697ebbf0d44419850743679390acf1"
