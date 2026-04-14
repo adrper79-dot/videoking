@@ -13,6 +13,8 @@ import adminRouter from "./routes/admin";
 import eventsRouter from "./routes/events";
 import assetsRouter from "./routes/assets";
 import adsRouter from "./routes/ads";
+import referralsRouter from "./routes/referrals";
+import analyticsRouter from "./routes/analytics";
 import { VideoRoom } from "./durable-objects/VideoRoom";
 import { UserPresence } from "./durable-objects/UserPresence";
 import { createDb } from "./lib/db";
@@ -104,6 +106,15 @@ app.route("/api/assets", assetsRouter);
 // ─── Ad Routes (Phase 3) ───────────────────────────────────────────────────────
 
 app.route("/api/ads", adsRouter);
+
+// ─── Referrals Routes (Phase 4) ────────────────────────────────────────────────
+
+app.route("/api/referrals", referralsRouter);
+
+// ─── Analytics Routes (Phase 4) ────────────────────────────────────────────────
+
+app.route("/api/admin/analytics", analyticsRouter);
+
 // ─── WebSocket: upgrade to VideoRoom Durable Object ──────────────────────────
 
 /**
