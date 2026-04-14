@@ -19,11 +19,30 @@ A **hyper-niche interactive video platform** built on the Cloudflare edge stack.
 
 ---
 
+## ✅ Pre-Deployment Validation
+
+Before pushing to production, run:
+```bash
+pnpm pre-deploy-check
+```
+
+This validates:
+- Environment variables configured
+- All static PWA files exist
+- No localhost hardcoded in code
+- Cloudflare project names correct
+- GitHub Actions build settings valid
+
+The check runs automatically in GitHub Actions on every push to `main`.
+
+---
+
 ## 📚 Documentation
 
 | Resource | Purpose |
 |---|---|
 | [LOCAL_DEVELOPMENT_SETUP.md](docs/LOCAL_DEVELOPMENT_SETUP.md) | Complete dev environment setup guide |
+| [PRE_DEPLOYMENT_CHECKS.md](docs/PRE_DEPLOYMENT_CHECKS.md) | Pre-deployment validation guide |
 | [PHASE_3_DEPLOYMENT_READY.md](docs/PHASE_3_DEPLOYMENT_READY.md) | Production deployment guide |
 | [ARCHITECTURE.md](docs/ARCHITECTURE.md) | System design and component overview |
 | [ENGINEERING.md](docs/ENGINEERING.md) | Code conventions and patterns |
