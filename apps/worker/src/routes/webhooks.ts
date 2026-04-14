@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import type { Env } from "../types";
 import { createDb } from "../lib/db";
 import { createStripeClient, verifyStripeWebhook, calculateFees } from "../lib/stripe";
+import { createEmailService } from "../lib/email";
 import { subscriptions, earnings, users, videoUnlocks, processedWebhookEvents } from "@nichestream/db";
 import { and, eq } from "drizzle-orm";
 import type Stripe from "stripe";
@@ -92,6 +93,22 @@ webhooksRouter.post("/stripe", async (c) => {
           .where(eq(subscriptions.stripeSubscriptionId, sub.id));
 
         if (existing?.subscriberId) {
+          // Send post-trial email
+          const [user] = await db
+            .select({ email: users.email, displayName: users.displayName })
+            .from(users)
+            .where(eq(users.id, existing.subscriberId))
+            .limit(1);
+
+          if (c.env.ENABLE_EMAIL_NOTIFICATIONS && user?.email) {
+            try {
+              const emailService = await createEmailService(c.env);
+              await emailService.sendTrialEnded(user.email, user.displayName || "there");
+            } catch (emailErr) {
+              console.error("Failed to send trial ended email:", emailErr);
+            }
+          }
+
           await refreshUserMembershipState(db, existing.subscriberId, "canceled");
         }
         break;
@@ -120,6 +137,14 @@ webhooksRouter.post("/stripe", async (c) => {
 
         if (subRecord?.subscriberId) {
           const { notifications } = await import("@nichestream/db");
+          
+          // Fetch user details for personalized email
+          const [user] = await db
+            .select({ email: users.email, displayName: users.displayName })
+            .from(users)
+            .where(eq(users.id, subRecord.subscriberId))
+            .limit(1);
+
           // Create trial ending soon notification (expires in 7 days)
           const expiresAt = new Date();
           expiresAt.setDate(expiresAt.getDate() + 7);
@@ -134,6 +159,17 @@ webhooksRouter.post("/stripe", async (c) => {
             priority: 2, // Urgent
             expiresAt,
           });
+
+          // Send email if enabled and user has email
+          if (c.env.ENABLE_EMAIL_NOTIFICATIONS && user?.email) {
+            try {
+              const emailService = await createEmailService(c.env);
+              await emailService.sendTrialEnding(user.email, 3, user.displayName || "there");
+            } catch (emailErr) {
+              console.error("Failed to send trial ending email:", emailErr);
+              // Don't fail webhook if email send fails
+            }
+          }
         }
         break;
       }

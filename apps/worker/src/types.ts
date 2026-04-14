@@ -44,4 +44,8 @@ export interface Env {
   CHAT_RATE_LIMIT_VIP_MS?: string;
   /** Trial length in days */
   TRIAL_PERIOD_DAYS?: string;
+  /** Email service API key (Resend, SendGrid, etc) */
+  EMAIL_API_KEY?: string;
+  /** Email preferences enabled */
+  ENABLE_EMAIL_NOTIFICATIONS?: string;
 }
