@@ -68,7 +68,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           cd apps/web
-          pnpm exec wrangler pages deploy dist
+          pnpm exec wrangler pages deploy .vercel/output/static
 
       - name: Notify deployment
         if: success()
