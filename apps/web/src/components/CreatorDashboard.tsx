@@ -5,6 +5,7 @@ import Link from "next/link";
 import { api } from "@/lib/api";
 import type { DashboardAnalytics } from "@nichestream/types";
 import { formatViews, formatCents } from "@/lib/utils";
+import { useEntitlements } from "@/components/EntitlementsContext";
 
 interface EarningsSummary {
 	totalGrossCents: number;
@@ -13,26 +14,42 @@ interface EarningsSummary {
 	transferredCents: number;
 }
 
+interface AdMetrics {
+	totalImpressions: number;
+	totalRevenueCents: number;
+	byVideo: Array<{ videoId: string; impressions: number; revenueCents: number }>;
+}
+
 /**
- * Creator dashboard showing stats, recent videos, and earnings overview.
+ * Creator dashboard showing stats, recent videos, earnings, and ad metrics.
  */
 export function CreatorDashboard() {
+	const { entitlements: userEntitlements } = useEntitlements();
 	const [analytics, setAnalytics] = useState<DashboardAnalytics | null>(null);
 	const [earnings, setEarnings] = useState<{ summary: EarningsSummary } | null>(null);
+	const [adMetrics, setAdMetrics] = useState<AdMetrics | null>(null);
 	const [loading, setLoading] = useState(true);
 
 	useEffect(() => {
+		const creatorId = userEntitlements?.user?.id;
+		if (!creatorId) {
+			setLoading(false);
+			return;
+		}
+
 		void Promise.all([
 			api.get<DashboardAnalytics>("/api/dashboard/analytics"),
 			api.get<{ summary: EarningsSummary }>("/api/dashboard/earnings"),
+			api.get<AdMetrics>(`/api/ads/metrics/${creatorId}?period=month`).catch(() => null),
 		])
-			.then(([analyticsData, earningsData]) => {
+			.then(([analyticsData, earningsData, adData]) => {
 				setAnalytics(analyticsData);
 				setEarnings(earningsData);
+				setAdMetrics(adData as AdMetrics | null);
 			})
 			.catch(console.error)
 			.finally(() => setLoading(false));
-	}, []);
+	}, [userEntitlements?.user?.id]);
 
 	if (loading) {
 		return (
@@ -45,6 +62,8 @@ export function CreatorDashboard() {
 	const stats = [
 		{ label: "Total Views (30d)", value: formatViews(analytics?.totalViews ?? 0) },
 		{ label: "Watch Time", value: `${analytics?.totalWatchTimeMinutes ?? 0}m` },
+		{ label: "Ad Impressions (30d)", value: formatViews(adMetrics?.totalImpressions ?? 0) },
+		{ label: "Ad Revenue", value: formatCents(adMetrics?.totalRevenueCents ?? 0) },
 		{ label: "Pending Earnings", value: formatCents(earnings?.summary.pendingCents ?? 0) },
 		{ label: "Total Earnings", value: formatCents(earnings?.summary.totalNetCents ?? 0) },
 	];
