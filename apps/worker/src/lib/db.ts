@@ -24,8 +24,8 @@ export function createDb(env: Env) {
 
   // Create new postgres client only once per isolate
   cachedPostgresClient = postgres(env.DB.connectionString, {
-    // Hyperdrive manages the pool; single connection per isolate
-    max: 1,
+    // Hyperdrive manages the pool; allow a few concurrent connections per isolate
+    max: 5,
     // Disable prefetching since we use Hyperdrive's pool
     fetch_types: false,
   });

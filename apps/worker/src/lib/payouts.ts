@@ -11,10 +11,10 @@
 
 import type { Context } from "hono";
 import Stripe from "stripe";
-import { eq, gte, lt, and, sum } from "drizzle-orm";
+import { eq, gte, lt, and, sum, count } from "drizzle-orm";
 import { createDb } from "./db";
 import type { Env } from "../types";
-import { earnings, connectedAccounts, payoutRuns } from "@nichestream/db";
+import { earnings, connectedAccounts, payoutRuns, chatMessages, polls, pollVotes, videoUnlocks, videos } from "@nichestream/db";
 
 interface PayoutSummary {
   creator_id: string;
@@ -85,10 +85,11 @@ export class PayoutEngine {
     const periodStart = new Date(year, month - 1, 1);
     const periodEnd = new Date(year, month, 1);
 
-    // Query earnings aggregated by creator for the month
+    // Query earnings grouped by (creatorId, type) to build accurate breakdown
     const earningsData = await this._db
       .select({
         creatorId: earnings.creatorId,
+        type: earnings.type,
         totalGrossCents: sum(earnings.grossAmountCents),
         totalPlatformFeeCents: sum(earnings.platformFeeCents),
         totalNetCents: sum(earnings.netAmountCents),
@@ -101,18 +102,41 @@ export class PayoutEngine {
           eq(earnings.status, "pending")
         )
       )
-      .groupBy(earnings.creatorId);
+      .groupBy(earnings.creatorId, earnings.type);
 
-    // Check Stripe Connect status for each creator
+    // Pivot rows into per-creator summaries with proper type breakdowns
+    const byCreator = new Map<string, {
+      gross: number;
+      pf: number;
+      net: number;
+      breakdown: PayoutSummary["breakdown"];
+    }>();
+
+    for (const row of earningsData) {
+      if (!byCreator.has(row.creatorId)) {
+        byCreator.set(row.creatorId, {
+          gross: 0,
+          pf: 0,
+          net: 0,
+          breakdown: { subscriptions_cents: 0, ads_cents: 0, unlocks_cents: 0, tips_cents: 0 },
+        });
+      }
+      const entry = byCreator.get(row.creatorId)!;
+      const gross = Number(row.totalGrossCents) || 0;
+      const pf = Number(row.totalPlatformFeeCents) || 0;
+      const net = Number(row.totalNetCents) || 0;
+      entry.gross += gross;
+      entry.pf += pf;
+      entry.net += net;
+      if (row.type === "subscription_share") entry.breakdown.subscriptions_cents += net;
+      else if (row.type === "ad_impression")  entry.breakdown.ads_cents += net;
+      else if (row.type === "unlock_purchase") entry.breakdown.unlocks_cents += net;
+      else if (row.type === "tip")             entry.breakdown.tips_cents += net;
+    }
+
     const summaries: PayoutSummary[] = [];
 
-    for (const data of earningsData) {
-      const creatorId = data.creatorId;
-      const totalGross = Number(data.totalGrossCents) || 0;
-      const totalPlatformFee = Number(data.totalPlatformFeeCents) || 0;
-      const totalNet = Number(data.totalNetCents) || 0;
-
-      // Check if creator has connected Stripe account
+    for (const [creatorId, totals] of byCreator) {
       const [account] = await this._db
         .select()
         .from(connectedAccounts)
@@ -132,21 +156,98 @@ export class PayoutEngine {
 
       summaries.push({
         creator_id: creatorId,
-        gross_cents: totalGross,
-        platform_fee_cents: totalPlatformFee,
-        net_cents: totalNet,
-        breakdown: {
-          subscriptions_cents: 0,
-          ads_cents: 0,
-          unlocks_cents: 0,
-          tips_cents: 0,
-        },
+        gross_cents: totals.gross,
+        platform_fee_cents: totals.pf,
+        net_cents: totals.net,
+        breakdown: totals.breakdown,
         stripe_account_id: stripeAccountId,
         status,
       });
     }
 
     return summaries;
+  }
+
+  /**
+   * Calculate engagement-weighted share fractions for each creator.
+   *
+   * Engagement score formula:
+   *   score = (chatMessages × 2) + (pollVotes × 1.5) + (videoUnlocks × 5)
+   *
+   * Returns a Map<creatorId, fraction> where all fractions sum to 1.0.
+   * Creators with zero engagement across the period receive fraction 0.
+   */
+  async calculateEngagementWeightedShares(
+    periodStart: Date,
+    periodEnd: Date,
+  ): Promise<Map<string, number>> {
+    // Parallel queries for each engagement signal
+    const [chatData, voteData, unlockData] = await Promise.all([
+      // Chat messages per creator (via video.creatorId, excluding deleted)
+      this._db
+        .select({ creatorId: videos.creatorId, msgCount: count(chatMessages.id) })
+        .from(chatMessages)
+        .innerJoin(videos, eq(chatMessages.videoId, videos.id))
+        .where(
+          and(
+            gte(chatMessages.createdAt, periodStart),
+            lt(chatMessages.createdAt, periodEnd),
+            eq(chatMessages.isDeleted, false),
+          ),
+        )
+        .groupBy(videos.creatorId),
+
+      // Poll votes per creator (via polls.creatorId)
+      this._db
+        .select({ creatorId: polls.creatorId, voteCount: count(pollVotes.id) })
+        .from(pollVotes)
+        .innerJoin(polls, eq(pollVotes.pollId, polls.id))
+        .where(
+          and(
+            gte(pollVotes.createdAt, periodStart),
+            lt(pollVotes.createdAt, periodEnd),
+          ),
+        )
+        .groupBy(polls.creatorId),
+
+      // Video unlocks per creator (via video.creatorId)
+      this._db
+        .select({ creatorId: videos.creatorId, unlockCount: count(videoUnlocks.id) })
+        .from(videoUnlocks)
+        .innerJoin(videos, eq(videoUnlocks.videoId, videos.id))
+        .where(
+          and(
+            gte(videoUnlocks.createdAt, periodStart),
+            lt(videoUnlocks.createdAt, periodEnd),
+          ),
+        )
+        .groupBy(videos.creatorId),
+    ]);
+
+    // Merge into a score map
+    const scores = new Map<string, number>();
+
+    for (const { creatorId, msgCount } of chatData) {
+      scores.set(creatorId, (scores.get(creatorId) ?? 0) + Number(msgCount) * 2);
+    }
+    for (const { creatorId, voteCount } of voteData) {
+      scores.set(creatorId, (scores.get(creatorId) ?? 0) + Number(voteCount) * 1.5);
+    }
+    for (const { creatorId, unlockCount } of unlockData) {
+      scores.set(creatorId, (scores.get(creatorId) ?? 0) + Number(unlockCount) * 5);
+    }
+
+    const totalScore = Array.from(scores.values()).reduce((a, b) => a + b, 0);
+
+    // Convert raw scores to fractional shares
+    const shares = new Map<string, number>();
+    if (totalScore === 0) return shares; // No engagement data — return empty map
+
+    for (const [creatorId, score] of scores) {
+      shares.set(creatorId, score / totalScore);
+    }
+
+    return shares;
   }
 
   /**

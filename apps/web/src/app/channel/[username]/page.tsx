@@ -21,9 +21,23 @@ export async function generateMetadata({ params }: ChannelPageProps): Promise<Me
   const { username } = await params;
   try {
     const { creator } = await api.get<ChannelResponse>(`/api/channels/${username}`);
+    const title = `${creator.displayName} (@${creator.username})`;
+    const description = creator.bio ?? `Watch ${creator.displayName}'s videos on NicheStream`;
     return {
-      title: `${creator.displayName} (@${creator.username})`,
-      description: creator.bio ?? `Watch ${creator.displayName}'s videos on NicheStream`,
+      title,
+      description,
+      openGraph: {
+        type: "profile",
+        title,
+        description,
+        images: creator.avatarUrl ? [{ url: creator.avatarUrl, width: 400, height: 400, alt: creator.displayName }] : [],
+      },
+      twitter: {
+        card: "summary",
+        title,
+        description,
+        images: creator.avatarUrl ? [creator.avatarUrl] : [],
+      },
     };
   } catch {
     return { title: "Channel" };

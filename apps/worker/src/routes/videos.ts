@@ -1,17 +1,28 @@
 import { Hono } from "hono";
-import { eq, desc, and, sql } from "drizzle-orm";
+import { eq, desc, and, sql, ilike, or } from "drizzle-orm";
 import type { Env } from "../types";
 import { createDb } from "../lib/db";
 import { createAuth } from "../lib/auth";
 import { getUserEntitlements } from "../lib/entitlements";
 import { getDirectUploadUrl, getSignedStreamUrl } from "../lib/stream";
-import { subscriptions, users, videoUnlocks, videos } from "@nichestream/db";
+import { subscriptions, users, videoUnlocks, videos, videoStyleEnum, videoToolEnum, videoGenreEnum } from "@nichestream/db";
 
 const videosRouter = new Hono<{ Bindings: Env }>();
 
+// Valid enums for filter allowlisting
+const VALID_STYLES = new Set(["digital", "traditional", "mixed_media", "3d"]);
+const VALID_TOOLS = new Set(["procreate", "clip_studio", "photoshop", "krita", "affinity", "blender", "maya", "traditional_media", "other"]);
+const VALID_GENRES = new Set(["animation", "comic", "illustration", "character_design", "concept_art", "afro_fantasy", "sci_fi", "animation_short", "process_video", "tutorial", "speedart", "other"]);
+
 /**
  * GET /api/videos
- * List videos with pagination and optional status/visibility filtering.
+ * List videos with pagination and optional BlerdArt discovery filters.
+ *
+ * Optional query params:
+ *   style  — art style enum (validated against allowlist)
+ *   tool   — tool enum (validated against allowlist)
+ *   genre  — genre enum (validated against allowlist)
+ *   search — full-text search on title/description (≤200 chars)
  */
 videosRouter.get("/", async (c) => {
   const db = createDb(c.env);
@@ -19,9 +30,28 @@ videosRouter.get("/", async (c) => {
   const pageSize = Math.min(50, Math.max(1, Number(c.req.query("pageSize") ?? 20)));
   const offset = (page - 1) * pageSize;
 
+  // Validated discovery filters
+  const rawStyle = c.req.query("style");
+  const rawTool = c.req.query("tool");
+  const rawGenre = c.req.query("genre");
+  const rawSearch = (c.req.query("search") ?? "").trim().slice(0, 200);
+
+  const styleFilter = rawStyle && VALID_STYLES.has(rawStyle) ? rawStyle : undefined;
+  const toolFilter = rawTool && VALID_TOOLS.has(rawTool) ? rawTool : undefined;
+  const genreFilter = rawGenre && VALID_GENRES.has(rawGenre) ? rawGenre : undefined;
+
   try {
+    // Build WHERE conditions
+    const conditions = [
+      eq(videos.status, "ready"),
+      eq(videos.visibility, "public"),
+      ...(styleFilter ? [eq(videos.style, styleFilter as (typeof videoStyleEnum.enumValues)[number])] : []),
+      ...(toolFilter ? [eq(videos.tool, toolFilter as (typeof videoToolEnum.enumValues)[number])] : []),
+      ...(genreFilter ? [eq(videos.genre, genreFilter as (typeof videoGenreEnum.enumValues)[number])] : []),
+      ...(rawSearch ? [or(ilike(videos.title, `%${rawSearch}%`), ilike(videos.description, `%${rawSearch}%`))] : []),
+    ];
+
     // Use COUNT(*) window function to avoid 2 separate queries
-    // In a single query, we get both paginated results and total count
     const rowsWithCount = await db
       .select({
         id: videos.id,
@@ -40,20 +70,16 @@ videosRouter.get("/", async (c) => {
         creatorUsername: users.username,
         creatorDisplayName: users.displayName,
         creatorAvatarUrl: users.avatarUrl,
-        // Window function: count all matching rows without pagination
         totalCount: sql<number>`count(*) over ()`,
       })
       .from(videos)
       .leftJoin(users, eq(videos.creatorId, users.id))
-      .where(and(eq(videos.status, "ready"), eq(videos.visibility, "public")))
+      .where(and(...conditions))
       .orderBy(desc(videos.publishedAt))
       .limit(pageSize)
       .offset(offset);
 
-    // Extract total count from the first row (same for all rows due to window function)
     const totalCount = rowsWithCount.length > 0 ? rowsWithCount[0].totalCount : 0;
-    
-    // Remove totalCount from response data
     const rows = rowsWithCount.map(({ totalCount: _, ...row }) => row);
 
     return c.json({
@@ -255,6 +281,21 @@ videosRouter.patch("/:id", async (c) => {
       visibility?: "public" | "subscribers_only" | "unlocked_only";
       status?: "ready" | "unlisted";
     }>();
+
+    // Validate title is not blank if provided
+    if (body.title !== undefined && body.title.trim().length === 0) {
+      return c.json({ error: "BadRequest", message: "Title cannot be blank" }, 400);
+    }
+
+    // Validate enum values
+    const VALID_VISIBILITY = new Set(["public", "subscribers_only", "unlocked_only"]);
+    const VALID_STATUS = new Set(["ready", "unlisted"]);
+    if (body.visibility !== undefined && !VALID_VISIBILITY.has(body.visibility)) {
+      return c.json({ error: "BadRequest", message: "Invalid visibility value" }, 400);
+    }
+    if (body.status !== undefined && !VALID_STATUS.has(body.status)) {
+      return c.json({ error: "BadRequest", message: "Invalid status value" }, 400);
+    }
 
     const [updated] = await db
       .update(videos)

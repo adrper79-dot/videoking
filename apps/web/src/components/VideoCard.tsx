@@ -15,7 +15,7 @@ interface VideoCardProps {
 export function VideoCard({ video }: VideoCardProps) {
   return (
     <article className="group flex flex-col overflow-hidden rounded-xl border border-neutral-800 bg-neutral-900 transition hover:border-neutral-600">
-      <Link href={`/watch/${video.id}`} aria-label={video.title}>
+      <Link href={`/watch/${video.id}`} aria-label={video.creatorUsername ? `${video.title} by ${video.creatorUsername}` : video.title}>
         <div className="relative aspect-video w-full overflow-hidden bg-neutral-800">
           {video.thumbnailUrl ? (
             <Image

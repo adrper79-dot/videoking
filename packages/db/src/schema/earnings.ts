@@ -31,6 +31,7 @@ export const earnings = pgTable("earnings", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
   creatorCreatedAtIdx: index("earnings_creator_created_at_idx").on(table.creatorId, table.createdAt),
+  creatorStatusIdx: index("earnings_creator_status_idx").on(table.creatorId, table.status),
 }));
 
 export const connectedAccounts = pgTable("connected_accounts", {

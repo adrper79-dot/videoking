@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { secureHeaders } from "hono/secure-headers";
 import type { Env } from "./types";
+import { getMissingEnvKeys } from "./types";
 import { loggingMiddleware } from "./lib/logger";
 import { authRoutes } from "./routes/auth";
 import { videoRoutes } from "./routes/videos";
@@ -17,14 +18,16 @@ import referralsRouter from "./routes/referrals";
 import analyticsRouter from "./routes/analytics";
 import { notificationRoutes } from "./routes/notifications";
 import { emailRoutes } from "./routes/email";
+import searchRouter from "./routes/search";
 import { VideoRoom } from "./durable-objects/VideoRoom";
 import { UserPresence } from "./durable-objects/UserPresence";
 import { createDb } from "./lib/db";
 import { createAuth } from "./lib/auth";
+import { createEmailService } from "./lib/email";
 import { getVideoAnalytics } from "./lib/stream";
-import { videos, earnings } from "@nichestream/db";
+import { videos, earnings, users } from "@nichestream/db";
 import { subscriptions } from "@nichestream/db";
-import { eq, desc, and, gte, count } from "drizzle-orm";
+import { eq, desc, and, gte, lte, count, isNotNull } from "drizzle-orm";
 
 // Re-export Durable Object classes so Wrangler can bind them
 export { VideoRoom, UserPresence };
@@ -35,6 +38,19 @@ const app = new Hono<{ Bindings: Env }>();
 
 app.use("*", loggingMiddleware());
 app.use("*", secureHeaders());
+
+// Fail fast if required env vars are missing (catches misconfigured deployments)
+app.use("*", async (c, next) => {
+  const missing = getMissingEnvKeys(c.env);
+  if (missing.length > 0) {
+    console.error(`[CONFIG] Missing required environment variables: ${missing.join(", ")}`);
+    return c.json(
+      { error: "ServiceUnavailable", message: "Server is misconfigured. Contact support." },
+      503,
+    );
+  }
+  return next();
+});
 
 // CORS: explicit allowlist enforced per-request via env.APP_BASE_URL
 app.use("/api/*", async (c, next) => {
@@ -123,6 +139,10 @@ app.route("/api/notifications", notificationRoutes);
 // ─── Email Routes (Phase 4) ────────────────────────────────────────────────────
 
 app.route("/api/email", emailRoutes);
+
+// ─── Search Routes ────────────────────────────────────────────────────────────
+
+app.route("/api/search", searchRouter);
 
 // ─── WebSocket: upgrade to VideoRoom Durable Object ──────────────────────────
 
@@ -284,4 +304,65 @@ app.onError((err, c) => {
   return c.json({ error: "InternalError", message: "An unexpected error occurred" }, 500);
 });
 
-export default app;
+// ─── Scheduled Cron Handler ───────────────────────────────────────────────────
+
+/**
+ * Runs daily at 10:00 UTC (see wrangler.toml [[triggers]]).
+ * Sends trial_ending emails to users whose trial expires in 1, 2, or 3 days
+ * and who have opted into trial_alerts email notifications.
+ */
+async function handleScheduled(env: Env): Promise<void> {
+  if (!env.ENABLE_EMAIL_NOTIFICATIONS) {
+    console.log("[CRON] Email notifications disabled — skipping trial expiry check");
+    return;
+  }
+
+  const db = createDb(env);
+  const emailService = await createEmailService(env);
+
+  const now = new Date();
+  const windowStart = new Date(now.getTime() + 1 * 24 * 60 * 60 * 1000); // 1 day from now
+  const windowEnd = new Date(now.getTime() + 4 * 24 * 60 * 60 * 1000);   // 4 days from now (exclusive)
+
+  const expiringUsers = await db
+    .select({
+      id: users.id,
+      email: users.email,
+      displayName: users.displayName,
+      trialEndsAt: users.trialEndsAt,
+      emailPreferences: users.emailPreferences,
+    })
+    .from(users)
+    .where(
+      and(
+        eq(users.subscriptionStatus, "trial"),
+        isNotNull(users.trialEndsAt),
+        gte(users.trialEndsAt, windowStart),
+        lte(users.trialEndsAt, windowEnd),
+      ),
+    );
+
+  console.log(`[CRON] Found ${expiringUsers.length} users with trials expiring in 1-3 days`);
+
+  for (const user of expiringUsers) {
+    if (!user.emailPreferences?.trial_alerts) continue;
+    if (!user.trialEndsAt) continue;
+
+    const msRemaining = user.trialEndsAt.getTime() - now.getTime();
+    const daysRemaining = Math.ceil(msRemaining / (24 * 60 * 60 * 1000));
+
+    try {
+      await emailService.sendTrialEnding(user.email, daysRemaining, user.displayName);
+      console.log(`[CRON] Sent trial_ending email to ${user.email} (${daysRemaining} days remaining)`);
+    } catch (err) {
+      console.error(`[CRON] Failed to send trial email to ${user.email}:`, err);
+    }
+  }
+}
+
+export default {
+  fetch: app.fetch,
+  async scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+    ctx.waitUntil(handleScheduled(env));
+  },
+};

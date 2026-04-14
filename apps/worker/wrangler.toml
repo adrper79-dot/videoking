@@ -55,3 +55,9 @@ STRIPE_CONNECT_CLIENT_ID = ""
 # STRIPE_SECRET_KEY       — Stripe API secret key (required)
 # STRIPE_WEBHOOK_SECRET   — Stripe webhook signing secret (required)
 # STREAM_API_TOKEN        — Cloudflare Stream API token (required)
+# EMAIL_API_KEY           — Resend API key for transactional emails (required for email sends)
+
+# ─── Scheduled Cron Triggers ──────────────────────────────────────────────────
+# Fires the `scheduled` handler daily at 10:00 UTC to send trial expiry emails
+[[triggers]]
+crons = ["0 10 * * *"]

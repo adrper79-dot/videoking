@@ -49,3 +49,25 @@ export interface Env {
   /** Email preferences enabled */
   ENABLE_EMAIL_NOTIFICATIONS?: string;
 }
+
+/**
+ * Required environment variable keys.
+ * The worker will return 503 on all requests if any of these are missing.
+ */
+const REQUIRED_ENV_KEYS: (keyof Env)[] = [
+  "DB",
+  "BETTER_AUTH_SECRET",
+  "STRIPE_SECRET_KEY",
+  "STRIPE_WEBHOOK_SECRET",
+  "STREAM_API_TOKEN",
+  "STREAM_ACCOUNT_ID",
+  "APP_BASE_URL",
+];
+
+/**
+ * Validates that all required environment bindings are present.
+ * Returns an array of missing key names; empty array means all good.
+ */
+export function getMissingEnvKeys(env: Env): string[] {
+  return REQUIRED_ENV_KEYS.filter((key) => !env[key] || env[key] === "");
+}

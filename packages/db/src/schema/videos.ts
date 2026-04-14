@@ -78,6 +78,7 @@ export const videos = pgTable("videos", {
 }, (table) => ({
   creatorIdIdx: index("videos_creator_id_idx").on(table.creatorId),
   statusVisibilityIdx: index("videos_status_visibility_idx").on(table.status, table.visibility, table.publishedAt),
+  creatorStatusVisibilityIdx: index("videos_creator_status_visibility_idx").on(table.creatorId, table.status, table.visibility),
   styleIdx: index("videos_style_idx").on(table.style),
   genreIdx: index("videos_genre_idx").on(table.genre),
   toolIdx: index("videos_tool_idx").on(table.tool),

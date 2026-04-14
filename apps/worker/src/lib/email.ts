@@ -287,16 +287,30 @@ export class EmailService {
   // ─── Low-level send ───────────────────────────────────────────────────
 
   private async send(to: string, subject: string, html: string): Promise<void> {
-    // This is abstracted — could use Resend, SendGrid, or any provider
-    // For now, log to console (would implement real provider in production)
-    console.log(`[EMAIL] To: ${to}, Subject: ${subject}`);
-    
-    // In production, would call actual email API:
-    // await fetch("https://api.resend.com/emails", {
-    //   method: "POST",
-    //   headers: { Authorization: `Bearer ${this.apiKey}` },
-    //   body: JSON.stringify({ from: this.fromEmail, to, subject, html }),
-    // });
+    if (!this.apiKey) {
+      console.log(`[EMAIL] No API key configured — skipping send to ${to} (${subject})`);
+      return;
+    }
+
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${this.apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: this.fromEmail,
+        to,
+        subject,
+        html,
+      }),
+    });
+
+    if (!res.ok) {
+      const errorBody = await res.text().catch(() => "(unreadable)");
+      console.error(`[EMAIL] Resend API error ${res.status} for ${to}: ${errorBody}`);
+      // Do not throw — email failures must not crash the caller
+    }
   }
 }
 

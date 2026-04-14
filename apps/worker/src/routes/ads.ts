@@ -47,6 +47,7 @@ router.get("/vast", async (c) => {
       creatorId: video.creatorId,
       adTagUrl: `${c.env.APP_BASE_URL}/api/ads/ad-tag?videoId=${videoId}`,
       videoDurationSeconds: video.durationSeconds ?? 600,
+      workerBaseUrl: c.env.APP_BASE_URL,
     });
 
     c.header("Content-Type", "application/xml");
@@ -168,8 +169,9 @@ function generateVastXml(options: {
   creatorId: string;
   adTagUrl: string;
   videoDurationSeconds: number;
+  workerBaseUrl: string;
 }): string {
-  const trackingBaseUrl = `${process.env.WORKER_URL}/api/ads/track`;
+  const trackingBaseUrl = `${options.workerBaseUrl}/api/ads/track`;
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <VAST version="4.0">
@@ -206,12 +208,12 @@ function generateVastXml(options: {
             </TrackingEvents>
             <VideoClicks>
               <ClickThrough>
-                <![CDATA[https://nichestream.com]]>
+                <![CDATA[https://nichestream.tv]]>
               </ClickThrough>
             </VideoClicks>
             <MediaFiles>
               <MediaFile id="1" delivery="progressive" type="video/mp4" width="640" height="360">
-                <![CDATA[https://via.placeholder.com/640x360/blue/white?text=NicheStream]]>
+                <![CDATA[${options.adTagUrl}]]>
               </MediaFile>
             </MediaFiles>
           </Linear>

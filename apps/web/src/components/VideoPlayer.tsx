@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState, useCallback } from "react";
 import { useVideoPlayer } from "@/hooks/useVideoPlayer";
 import { useVideoPlayback } from "./VideoPlaybackContext";
 import { logAdImpression } from "@/lib/api";
@@ -30,11 +30,22 @@ export function VideoPlayer({
   className,
 }: VideoPlayerProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const hideTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const [controlsVisible, setControlsVisible] = useState(false);
   const { isPlaying, currentTime, duration, volume, isMuted, play, pause, seek, setVolume, toggleMute, toggleFullscreen } =
     useVideoPlayer({ iframeRef });
   
   const { setCurrentTime } = useVideoPlayback();
-  
+
+  const showControlsTemporarily = useCallback(() => {
+    clearTimeout(hideTimerRef.current);
+    setControlsVisible(true);
+    hideTimerRef.current = setTimeout(() => setControlsVisible(false), 3000);
+  }, []);
+
+  // Cleanup hide timer on unmount
+  useEffect(() => () => clearTimeout(hideTimerRef.current), []);
+
   // Log ad impression on mount if showAds is true
   useEffect(() => {
     if (showAds && streamVideoId) {
@@ -75,6 +86,7 @@ export function VideoPlayer({
       )}
       role="region"
       aria-label={`Video player: ${title}`}
+      onClick={showControlsTemporarily}
     >
       {/* Stream iframe */}
       <iframe
@@ -88,7 +100,7 @@ export function VideoPlayer({
       />
 
       {/* Custom controls overlay */}
-      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent px-4 pb-4 pt-8 opacity-0 transition-opacity duration-200 group-hover:opacity-100 focus-within:opacity-100">
+      <div className={cn("absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent px-4 pb-4 pt-8 opacity-0 transition-opacity duration-200 group-hover:opacity-100 focus-within:opacity-100", controlsVisible && "opacity-100")}>
         {/* Progress bar */}
         <div
           className="relative mb-3 h-1 cursor-pointer rounded-full bg-white/30"

@@ -34,7 +34,7 @@ const router = new Hono<{ Bindings: Env }>();
  *   ...
  * ]
  */
-router.get("/cohorts", requireAdmin, async (c) => {
+router.get("/cohorts", requireAdmin(), async (c) => {
   try {
     const startDateParam = c.req.query("start_date");
     const endDateParam = c.req.query("end_date");
@@ -115,7 +115,7 @@ router.get("/cohorts", requireAdmin, async (c) => {
  *   at_risk_users: [{ user_id, inactivity_days, last_activity, cohort_date }]
  * }
  */
-router.get("/churn", requireAdmin, async (c) => {
+router.get("/churn", requireAdmin(), async (c) => {
   try {
     const inactivityThreshold = parseInt(c.req.query("inactivity_threshold_days") || "7");
 
@@ -188,7 +188,7 @@ router.get("/churn", requireAdmin, async (c) => {
  *   organic_conversion_rate: 0.25
  * }
  */
-router.get("/conversion-funnel", requireAdmin, async (c) => {
+router.get("/conversion-funnel", requireAdmin(), async (c) => {
   try {
     const db = createDb(c.env);
 
@@ -264,7 +264,7 @@ router.get("/conversion-funnel", requireAdmin, async (c) => {
  *   }
  * }
  */
-router.get("/arpu", requireAdmin, async (c) => {
+router.get("/arpu", requireAdmin(), async (c) => {
   try {
     const db = createDb(c.env);
 

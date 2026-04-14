@@ -39,16 +39,15 @@ export function AdminPanel() {
   useEffect(() => {
     void (async () => {
       try {
-        // Fetch session from the auth API endpoint
-        const sessionData = await api.get<Session>("/api/auth/session");
+        const [sessionData, creatorsData] = await Promise.all([
+          api.get<Session>("/api/auth/session"),
+          api.get<{ creators: CreatorRecord[] }>("/api/admin/creators?pageSize=100"),
+        ]);
         setSession(sessionData);
-
-        // For now, we'll display placeholder message
-        // In production, this would fetch a list of creators from an admin endpoint
-        setCreators([]);
+        setCreators(creatorsData.creators);
         setLoading(false);
       } catch (err) {
-        console.error("Failed to fetch session:", err);
+        console.error("Failed to fetch admin data:", err);
         setError("Failed to load admin panel. Please ensure you are logged in.");
         setLoading(false);
       }

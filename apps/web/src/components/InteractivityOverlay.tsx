@@ -35,6 +35,8 @@ export function InteractivityOverlay({ videoId }: InteractivityOverlayProps) {
   const userId = entitlements?.user?.id;
   const username = entitlements?.user?.username ?? "Guest";
   const avatarUrl = entitlements?.user?.avatarUrl ?? null;
+  // Derive currentTier before handleMessage so the callback captures the latest value
+  const currentTier: UserTier = entitlements?.user?.effectiveTier ?? "free";
 
   useEffect(() => {
     if (!notice) return;
@@ -97,7 +99,7 @@ export function InteractivityOverlay({ videoId }: InteractivityOverlayProps) {
         break;
       }
     }
-  }, []);
+  }, [currentTier]);
 
   const { isConnected, sendMessage } = useWebSocket({
     videoId,
@@ -112,8 +114,6 @@ export function InteractivityOverlay({ videoId }: InteractivityOverlayProps) {
     { id: "polls", label: "Polls" },
     { id: "watch-party", label: "Watch Party" },
   ];
-
-  const currentTier: UserTier = entitlements?.user?.effectiveTier ?? "free";
 
   return (
     <div className="flex h-[calc(100vh-6rem)] flex-col overflow-hidden rounded-xl border border-neutral-800 bg-neutral-900">

@@ -1,11 +1,58 @@
 import { Hono } from "hono";
-import { eq } from "drizzle-orm";
+import { eq, ilike, or, desc, and } from "drizzle-orm";
 import type { Env } from "../types";
 import { createDb } from "../lib/db";
 import { requireAdmin } from "../middleware/admin";
 import { users } from "@nichestream/db";
 
 const adminRouter = new Hono<{ Bindings: Env }>();
+
+/**
+ * GET /admin/creators
+ * List all users with role=creator, with optional search by username/displayName.
+ * Supports pagination via page + pageSize query params.
+ */
+adminRouter.get("/creators", requireAdmin(), async (c) => {
+  const db = createDb(c.env);
+  const rawQ = (c.req.query("q") ?? "").trim().slice(0, 200);
+  const page = Math.max(1, parseInt(c.req.query("page") ?? "1", 10) || 1);
+  const pageSize = Math.min(100, Math.max(1, parseInt(c.req.query("pageSize") ?? "50", 10) || 50));
+  const offset = (page - 1) * pageSize;
+
+  try {
+    const whereConditions = [eq(users.role, "creator")];
+
+    if (rawQ) {
+      whereConditions.push(
+        or(
+          ilike(users.username, `%${rawQ}%`),
+          ilike(users.displayName, `%${rawQ}%`),
+        ) as ReturnType<typeof eq>,
+      );
+    }
+
+    const results = await db
+      .select({
+        id: users.id,
+        username: users.username,
+        displayName: users.displayName,
+        avatarUrl: users.avatarUrl,
+        blerdartVerified: users.blerdartVerified,
+        subscriptionStatus: users.subscriptionStatus,
+        createdAt: users.createdAt,
+      })
+      .from(users)
+      .where(and(...whereConditions))
+      .orderBy(desc(users.createdAt))
+      .limit(pageSize)
+      .offset(offset);
+
+    return c.json({ creators: results, page, pageSize });
+  } catch (err) {
+    console.error("GET /admin/creators error:", err);
+    return c.json({ error: "InternalError", message: "Failed to fetch creators" }, 500);
+  }
+});
 
 /**
  * POST /admin/verify-creator
