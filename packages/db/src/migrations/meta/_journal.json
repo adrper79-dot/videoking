@@ -8,6 +8,13 @@
       "when": 1776047911905,
       "tag": "0000_stale_kingpin",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1776181851084,
+      "tag": "0001_parallel_mephistopheles",
+      "breakpoints": true
     }
   ]
 }
