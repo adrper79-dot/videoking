@@ -15,16 +15,16 @@
 
 import type { Context } from "hono";
 import Stripe from "stripe";
-import { createDb } from "@nichestream/db";
+import { createDb } from "./db";
 import { createAuth } from "./auth";
 import type { Env } from "../types";
 
 export class StripeConnectOAuth {
-  private stripe: Stripe;
+  private _stripe: Stripe;
   private env: Env;
 
   constructor(stripeSecretKey: string, env: Env) {
-    this.stripe = new Stripe(stripeSecretKey);
+    this._stripe = new Stripe(stripeSecretKey);
     this.env = env;
   }
 
@@ -36,7 +36,7 @@ export class StripeConnectOAuth {
    */
   generateAuthUrl(userId: string): string {
     const params = new URLSearchParams({
-      client_id: this.stripe.client_id || "",
+      client_id: this.env.STRIPE_CONNECT_CLIENT_ID || "",
       state: encodeURIComponent(JSON.stringify({ user_id: userId })),
       stripe_user: JSON.stringify({
         business_type: "individual",
@@ -64,19 +64,20 @@ export class StripeConnectOAuth {
    * - Set user's stripe_account_id
    */
   async handleCallback(
-    code: string,
+    _code: string,
     state: string,
-    db: ReturnType<typeof createDb>
+    _db: ReturnType<typeof createDb>
   ): Promise<{ success: boolean; stripe_account_id?: string; error?: string }> {
     try {
       // Parse state to get user_id
-      let userId: string;
-      try {
-        const stateData = JSON.parse(decodeURIComponent(state));
-        userId = stateData.user_id;
-      } catch (e) {
-        return { success: false, error: "Invalid state parameter" };
-      }
+      const _userId: string = (() => {
+        try {
+          const stateData = JSON.parse(decodeURIComponent(state));
+          return stateData.user_id;
+        } catch (e) {
+          throw new Error("Invalid state parameter");
+        }
+      })();
 
       // Exchange authorization code for connected account
       // Note: This uses Stripe's OAuth token exchange
@@ -113,14 +114,14 @@ export class StripeConnectOAuth {
    * 
    * Used to verify creator can receive payouts
    */
-  async getAccountStatus(stripeAccountId: string): Promise<{
+  async getAccountStatus(_stripeAccountId: string): Promise<{
     charges_enabled: boolean;
     payouts_enabled: boolean;
     requirements_due_by?: string;
   }> {
     try {
       // TODO: Call Stripe API to get account details
-      // const account = await this.stripe.account.retrieve(stripeAccountId);
+      // const account = await this._stripe.account.retrieve(_stripeAccountId);
 
       return {
         charges_enabled: false,
@@ -136,7 +137,7 @@ export class StripeConnectOAuth {
    * Disconnect creator's Stripe account
    * (for when creator wants to disconnect)
    */
-  async disconnectAccount(userId: string, db: ReturnType<typeof createDb>): Promise<void> {
+  async disconnectAccount(userId: string, _db: ReturnType<typeof createDb>): Promise<void> {
     // TODO: Delete from connected_accounts table
     // Update user to remove stripe_account_id
     console.log(`Disconnected Stripe account for user ${userId}`);
@@ -151,7 +152,7 @@ export async function handleAuthorize(c: Context<{ Bindings: Env }>): Promise<Re
   try {
     const db = createDb(c.env);
     const auth = createAuth(db, c.env);
-    const session = await auth.api.getSession(c);
+    const session = await auth.api.getSession({ headers: c.req.raw.headers });
 
     if (!session) {
       return c.json({ error: "Unauthorized" }, 401);
@@ -214,9 +215,9 @@ export async function handleCallback(c: Context<{ Bindings: Env }>): Promise<Res
  */
 export async function handleStatus(c: Context<{ Bindings: Env }>): Promise<Response> {
   try {
-    const db = createDb(c.env);
-    const auth = createAuth(db, c.env);
-    const session = await auth.api.getSession(c);
+    const _db = createDb(c.env);
+    const auth = createAuth(_db, c.env);
+    const session = await auth.api.getSession({ headers: c.req.raw.headers });
 
     if (!session) {
       return c.json({ error: "Unauthorized" }, 401);

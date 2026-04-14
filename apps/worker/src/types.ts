@@ -17,6 +17,8 @@ export interface Env {
   STREAM_CUSTOMER_DOMAIN: string;
   /** Stripe secret key */
   STRIPE_SECRET_KEY: string;
+  /** Stripe Connect OAuth client ID */
+  STRIPE_CONNECT_CLIENT_ID: string;
   /** Stripe webhook signing secret */
   STRIPE_WEBHOOK_SECRET: string;
   /** Stripe Connect return URL base */

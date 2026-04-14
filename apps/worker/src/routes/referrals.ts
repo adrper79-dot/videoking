@@ -11,9 +11,11 @@
  */
 
 import { Hono } from "hono";
-import { createDb } from "@nichestream/db";
+import { eq } from "drizzle-orm";
+import { createDb } from "../lib/db";
 import { createAuth } from "../lib/auth";
 import type { Env } from "../types";
+import { users } from "@nichestream/db";
 
 const router = new Hono<{ Bindings: Env }>();
 
@@ -28,7 +30,7 @@ router.post("/create", async (c) => {
   try {
     const db = createDb(c.env);
     const auth = createAuth(db, c.env);
-    const session = await auth.api.getSession(c);
+    const session = await auth.api.getSession({ headers: c.req.raw.headers });
 
     if (!session) {
       return c.json({ error: "Unauthorized" }, 401);
@@ -37,9 +39,11 @@ router.post("/create", async (c) => {
     const userId = session.user.id;
     
     // Generate referral code (username + random suffix)
-    const user = await db.query.users.findFirst({
-      where: (users, { eq }) => eq(users.id, userId),
-    });
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
 
     if (!user) {
       return c.json({ error: "User not found" }, 404);
@@ -74,13 +78,13 @@ router.get("/my-link", async (c) => {
   try {
     const db = createDb(c.env);
     const auth = createAuth(db, c.env);
-    const session = await auth.api.getSession(c);
+    const session = await auth.api.getSession({ headers: c.req.raw.headers });
 
     if (!session) {
       return c.json({ error: "Unauthorized" }, 401);
     }
 
-    const userId = session.user.id;
+    const _userId = session.user.id;
 
     // TODO: Query referrals table
     // const referral = await db.query.referrals.findFirst({
@@ -113,9 +117,9 @@ router.get("/my-link", async (c) => {
  */
 router.get("/stats", async (c) => {
   try {
-    const db = createDb(c.env);
-    const auth = createAuth(db, c.env);
-    const session = await auth.api.getSession(c);
+    const _db = createDb(c.env);
+    const auth = createAuth(_db, c.env);
+    const session = await auth.api.getSession({ headers: c.req.raw.headers });
 
     if (!session) {
       return c.json({ error: "Unauthorized" }, 401);
@@ -160,7 +164,7 @@ router.post("/apply", async (c) => {
       return c.json({ error: "Missing referral_code or user_id" }, 400);
     }
 
-    const db = createDb(c.env);
+    const _db = createDb(c.env);
 
     // TODO: Implement referral application logic
     // 1. Query referrals table for matching code

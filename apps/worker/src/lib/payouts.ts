@@ -11,7 +11,7 @@
 
 import type { Context } from "hono";
 import Stripe from "stripe";
-import { createDb } from "@nichestream/db";
+import { createDb } from "./db";
 import type { Env } from "../types";
 
 interface PayoutSummary {
@@ -30,13 +30,13 @@ interface PayoutSummary {
 }
 
 export class PayoutEngine {
-  private db: ReturnType<typeof createDb>;
+  private _db: ReturnType<typeof createDb>;
   private stripe: Stripe;
-  private env: Env;
+  private _env: Env;
 
   constructor(db: ReturnType<typeof createDb>, env: Env, stripeClient: Stripe) {
-    this.db = db;
-    this.env = env;
+    this._db = db;
+    this._env = env;
     this.stripe = stripeClient;
   }
 
@@ -80,8 +80,8 @@ export class PayoutEngine {
     month: number,
     year: number
   ): Promise<PayoutSummary[]> {
-    const periodStart = new Date(year, month - 1, 1);
-    const periodEnd = new Date(year, month, 1);
+    const _periodStart = new Date(year, month - 1, 1);
+    const _periodEnd = new Date(year, month, 1);
 
     // TODO: Implement aggregation query
     // SELECT
@@ -176,7 +176,7 @@ export class PayoutEngine {
    * Handle Stripe transfer webhook events
    * (charge.transferred, transfer.paid, transfer.failed)
    */
-  async handleTransferWebhookEvent(event: Stripe.Event): Promise<void> {
+  async handleTransferWebhookEvent(_event: Stripe.Event): Promise<void> {
     // TODO: Parse transfer event from Stripe
     // Update payout_runs.transfer_status and related fields
   }

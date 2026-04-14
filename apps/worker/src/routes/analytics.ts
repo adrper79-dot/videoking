@@ -12,26 +12,10 @@
  */
 
 import { Hono } from "hono";
-import { createDb } from "@nichestream/db";
-import { createAuth } from "../lib/auth";
 import type { Env } from "../types";
+import { requireAdmin } from "../middleware/admin";
 
 const router = new Hono<{ Bindings: Env }>();
-
-/**
- * Middleware: Require admin role
- */
-const requireAdmin = async (c: any, next: any) => {
-  const db = createDb(c.env);
-  const auth = createAuth(db, c.env);
-  const session = await auth.api.getSession(c);
-
-  if (!session || session.user.role !== "admin") {
-    return c.json({ error: "Forbidden: admin access required" }, 403);
-  }
-
-  await next();
-};
 
 /**
  * GET /api/admin/analytics/cohorts
@@ -49,8 +33,8 @@ const requireAdmin = async (c: any, next: any) => {
  */
 router.get("/cohorts", requireAdmin, async (c) => {
   try {
-    const startDate = c.req.query("start_date");
-    const endDate = c.req.query("end_date");
+    const _startDate = c.req.query("start_date");
+    const _endDate = c.req.query("end_date");
 
     // TODO: Implement cohort query
     // 1. Query cohorts_daily table
@@ -86,7 +70,7 @@ router.get("/cohorts", requireAdmin, async (c) => {
  */
 router.get("/churn", requireAdmin, async (c) => {
   try {
-    const inactivityThreshold = parseInt(c.req.query("inactivity_threshold_days") || "7");
+    const _inactivityThreshold = parseInt(c.req.query("inactivity_threshold_days") || "7");
 
     // TODO: Implement churn query
     // 1. Query churn_tracking table
