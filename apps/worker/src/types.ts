@@ -35,6 +35,7 @@ export interface Env {
   STRIPE_CITIZEN_MONTHLY_PRICE?: string;
   STRIPE_CITIZEN_ANNUAL_PRICE?: string;
   STRIPE_VIP_MONTHLY_PRICE?: string;
+  STRIPE_VIP_ANNUAL_PRICE?: string;
   /** Chat throttling controls by tier */
   CHAT_RATE_LIMIT_FREE_MS?: string;
   CHAT_RATE_LIMIT_CITIZEN_MS?: string;

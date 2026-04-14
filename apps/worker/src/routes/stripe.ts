@@ -131,6 +131,8 @@ stripeRouter.get("/connect/status", async (c) => {
  * POST /api/stripe/subscriptions
  * Creates a Stripe Checkout Session for subscribing to a creator.
  * Routes platform fee and creator share via application_fee_amount.
+ * 
+ * Supports both Citizen and VIP tiers with monthly/annual plans.
  */
 stripeRouter.post("/subscriptions", async (c) => {
   const db = createDb(c.env);
@@ -146,20 +148,41 @@ stripeRouter.post("/subscriptions", async (c) => {
   try {
     const body = await c.req.json<{
       creatorId: string;
+      tier: "citizen" | "vip";
       plan: "monthly" | "annual";
       priceId: string;
     }>();
 
-    if (!body.creatorId || !body.priceId || !["monthly", "annual"].includes(body.plan)) {
+    if (
+      !body.creatorId ||
+      !body.priceId ||
+      !["monthly", "annual"].includes(body.plan) ||
+      !["citizen", "vip"].includes(body.tier)
+    ) {
       return c.json({ error: "ValidationError", message: "Invalid subscription request" }, 400);
     }
 
+    // Determine the expected price ID based on tier and plan
     const expectedPriceId =
-      body.plan === "annual"
-        ? c.env.STRIPE_CITIZEN_ANNUAL_PRICE
-        : c.env.STRIPE_CITIZEN_MONTHLY_PRICE;
+      body.tier === "vip"
+        ? body.plan === "annual"
+          ? c.env.STRIPE_VIP_ANNUAL_PRICE
+          : c.env.STRIPE_VIP_MONTHLY_PRICE
+        : body.plan === "annual"
+          ? c.env.STRIPE_CITIZEN_ANNUAL_PRICE
+          : c.env.STRIPE_CITIZEN_MONTHLY_PRICE;
 
-    if (expectedPriceId && body.priceId !== expectedPriceId) {
+    if (!expectedPriceId) {
+      return c.json(
+        {
+          error: "Misconfigured",
+          message: `Stripe price not configured for ${body.tier} ${body.plan}`,
+        },
+        500,
+      );
+    }
+
+    if (body.priceId !== expectedPriceId) {
       return c.json({ error: "ValidationError", message: "Unexpected price selected" }, 400);
     }
 
@@ -183,6 +206,7 @@ stripeRouter.post("/subscriptions", async (c) => {
       metadata: {
         subscriberId: session.user.id,
         creatorId: body.creatorId,
+        tier: body.tier,
         plan: body.plan,
       },
     });

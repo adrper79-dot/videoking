@@ -1,7 +1,7 @@
 import { Hono } from "hono";
-import { logger } from "hono/logger";
 import { secureHeaders } from "hono/secure-headers";
 import type { Env } from "./types";
+import { loggingMiddleware } from "./lib/logger";
 import { authRoutes } from "./routes/auth";
 import { videoRoutes } from "./routes/videos";
 import { channelRoutes } from "./routes/channels";
@@ -29,7 +29,7 @@ const app = new Hono<{ Bindings: Env }>();
 
 // ─── Global Middleware ────────────────────────────────────────────────────────
 
-app.use("*", logger());
+app.use("*", loggingMiddleware());
 app.use("*", secureHeaders());
 
 // CORS: explicit allowlist enforced per-request via env.APP_BASE_URL

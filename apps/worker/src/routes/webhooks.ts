@@ -168,7 +168,7 @@ async function handleSubscriptionUpdated(
   platformFeePercent: number,
   insertEarnings: boolean,
 ): Promise<void> {
-  const { subscriberId, creatorId, plan } = sub.metadata ?? {};
+  const { subscriberId, creatorId, plan, tier } = sub.metadata ?? {};
 
   if (!subscriberId || !creatorId) return;
 
@@ -203,7 +203,9 @@ async function handleSubscriptionUpdated(
     });
   }
 
-  await refreshUserMembershipState(db, subscriberId, status);
+  // Extract tier from metadata, default to citizen
+  const userTier = (tier === "vip" ? "vip" : "citizen") as "citizen" | "vip";
+  await refreshUserMembershipState(db, subscriberId, status, userTier);
 
   // Only insert earnings on subscription.created (insertEarnings flag), not on every renewal
   if (insertEarnings && status === "active") {
@@ -232,6 +234,7 @@ async function refreshUserMembershipState(
   db: ReturnType<typeof createDb>,
   subscriberId: string,
   fallbackStatus: "active" | "canceled" | "past_due",
+  userTier: "citizen" | "vip" = "citizen",
 ): Promise<void> {
   const [activeSubscription] = await db
     .select({ id: subscriptions.id })
@@ -246,7 +249,7 @@ async function refreshUserMembershipState(
 
   if (activeSubscription) {
     await syncUserMembershipStatus(db, subscriberId, {
-      userTier: "citizen",
+      userTier,
       subscriptionStatus: "active",
     });
     return;

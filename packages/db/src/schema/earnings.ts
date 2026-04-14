@@ -6,6 +6,7 @@ export const earningTypeEnum = pgEnum("earning_type", [
   "subscription_share",
   "unlock_purchase",
   "tip",
+  "ad_impression",
 ]);
 
 export const earningStatusEnum = pgEnum("earning_status", [
