@@ -57,6 +57,12 @@ STRIPE_CONNECT_CLIENT_ID = ""
 # STREAM_API_TOKEN        — Cloudflare Stream API token (required)
 # EMAIL_API_KEY           — Resend API key for transactional emails (required for email sends)
 
+# ─── Routes ──────────────────────────────────────────────────────────────────
+# Custom domain routing for the Worker
+[[routes]]
+pattern = "api.itsjusus.com/*"
+zone_name = "itsjusus.com"
+
 # ─── Scheduled Cron Triggers ──────────────────────────────────────────────────
 # Fires the `scheduled` handler daily at 10:00 UTC to send trial expiry emails
 [[triggers]]
