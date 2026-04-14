@@ -21,6 +21,23 @@ export function Navbar() {
   const effectiveTier = entitlements?.user?.effectiveTier ?? "free";
   const isAuthenticated = entitlements?.authenticated ?? false;
 
+  /**
+   * Calculate days remaining in trial
+   * Uses trialEndsAt timestamp to determine countdown
+   */
+  const getTrialDaysRemaining = (): number | null => {
+    if (effectiveTier !== "free" || !entitlements?.user?.trialEndsAt) {
+      return null;
+    }
+    const trialEndsAt = new Date(entitlements.user.trialEndsAt).getTime();
+    const now = new Date().getTime();
+    const daysRemaining = Math.ceil((trialEndsAt - now) / (24 * 60 * 60 * 1000));
+    return daysRemaining > 0 ? daysRemaining : null;
+  };
+
+  const daysRemaining = getTrialDaysRemaining();
+  const showTrialBanner = daysRemaining !== null && daysRemaining <= 3;
+
   return (
     <nav
       className="fixed inset-x-0 top-0 z-50 border-b border-neutral-800 bg-neutral-950/95 backdrop-blur"
@@ -42,6 +59,24 @@ export function Navbar() {
           </div>
         </div>
       )}
+
+      {/* Trial countdown banner */}
+      {showTrialBanner && daysRemaining !== null && (
+        <div className="border-b border-amber-900/50 bg-amber-950/50 px-4 py-2">
+          <div className="mx-auto flex max-w-7xl items-center justify-between gap-3">
+            <p className="text-sm text-amber-200">
+              Your trial ends in <span className="font-semibold">{daysRemaining} day{daysRemaining !== 1 ? 's' : ''}</span> — subscribe for just <span className="font-semibold">$1/month</span>
+            </p>
+            <Link
+              href="/pricing?offer=trial_urgent"
+              className="rounded px-3 py-1 text-xs font-semibold text-amber-300 hover:bg-amber-900/30 transition"
+            >
+              Subscribe Now
+            </Link>
+          </div>
+        </div>
+      )}
+
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2" aria-label="NicheStream home">
