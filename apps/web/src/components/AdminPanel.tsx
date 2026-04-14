@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import { AnalyticsDashboard } from "./AnalyticsDashboard";
 
 interface CreatorRecord {
   id: string;
@@ -22,10 +23,11 @@ interface Session {
 }
 
 /**
- * Admin panel for managing creator verification.
+ * Admin panel for managing creator verification and viewing analytics.
  * Only admins can access this component.
  */
 export function AdminPanel() {
+  const [activeTab, setActiveTab] = useState<"creators" | "analytics">("analytics");
   const [session, setSession] = useState<Session | null>(null);
   const [creators, setCreators] = useState<CreatorRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -119,83 +121,112 @@ export function AdminPanel() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h2 className="text-2xl font-bold text-white">Creator Management</h2>
+        <h2 className="text-2xl font-bold text-white">Admin Dashboard</h2>
         <p className="mt-1 text-sm text-gray-400">
-          Verify and manage BlerdArt creator accounts
+          Analytics, creators, and platform management
         </p>
       </div>
 
-      {/* Alerts */}
-      {error && (
-        <div className="rounded-lg border border-red-900/30 bg-red-950/20 p-4">
-          <p className="text-sm text-red-200">{error}</p>
-        </div>
-      )}
-
-      {successMessage && (
-        <div className="rounded-lg border border-green-900/30 bg-green-950/20 p-4">
-          <p className="text-sm text-green-200">{successMessage}</p>
-        </div>
-      )}
-
-      {/* Search */}
-      <div>
-        <input
-          type="text"
-          placeholder="Search creators by username or name..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full rounded-lg border border-gray-700 bg-gray-900 px-4 py-2 text-white placeholder-gray-500 focus:border-brand-500 focus:outline-none"
-        />
+      {/* Tab Navigation */}
+      <div className="flex gap-4 border-b border-neutral-800">
+        <button
+          onClick={() => setActiveTab("analytics")}
+          className={`px-4 py-2 font-medium transition-colors ${
+            activeTab === "analytics"
+              ? "border-b-2 border-brand-500 text-white"
+              : "text-neutral-400 hover:text-white"
+          }`}
+        >
+          Analytics
+        </button>
+        <button
+          onClick={() => setActiveTab("creators")}
+          className={`px-4 py-2 font-medium transition-colors ${
+            activeTab === "creators"
+              ? "border-b-2 border-brand-500 text-white"
+              : "text-neutral-400 hover:text-white"
+          }`}
+        >
+          Creators
+        </button>
       </div>
 
-      {/* Creator List */}
-      <div className="space-y-3">
-        {filteredCreators.length === 0 ? (
-          <div className="rounded-lg border border-gray-700 bg-gray-900/50 p-8 text-center">
-            <p className="text-gray-400">
-              {creators.length === 0
-                ? "No creators found. Verification feature is being populated."
-                : "No creators matching your search"}
-            </p>
-          </div>
-        ) : (
-          filteredCreators.map((creator) => (
-            <div
-              key={creator.id}
-              className="flex items-center justify-between rounded-lg border border-gray-700 bg-gray-900/50 px-6 py-4"
-            >
-              <div className="flex items-center space-x-4">
-                {creator.avatarUrl && (
-                  <img
-                    src={creator.avatarUrl}
-                    alt={creator.displayName}
-                    className="h-10 w-10 rounded-full"
-                  />
-                )}
-                <div>
-                  <p className="font-semibold text-white">{creator.displayName}</p>
-                  <p className="text-sm text-gray-400">@{creator.username}</p>
-                </div>
-              </div>
+      {/* Tab Content */}
+      {activeTab === "analytics" ? (
+        <AnalyticsDashboard />
+      ) : (
+        <>
+          {/* Alerts */}
+          {error && (
+            <div className="rounded-lg border border-red-900/30 bg-red-950/20 p-4">
+              <p className="text-sm text-red-200">{error}</p>
+            </div>
+          )}
 
-              <div className="flex items-center space-x-3">
-                {creator.blerdartVerified && (
-                  <span className="inline-flex items-center rounded-full bg-blue-900/30 px-3 py-1 text-xs font-medium text-blue-200">
-                    ✓ Verified
-                  </span>
-                )}
-                <button
-                  onClick={() =>
-                    handleVerifyCreator(
-                      creator.id,
-                      creator.blerdartVerified
-                    )
-                  }
-                  disabled={verifying === creator.id}
-                  className={`rounded px-4 py-2 text-sm font-medium transition-colors ${
-                    creator.blerdartVerified
-                      ? "border border-red-700 text-red-300 hover:bg-red-900/20 disabled:opacity-50"
+          {successMessage && (
+            <div className="rounded-lg border border-green-900/30 bg-green-950/20 p-4">
+              <p className="text-sm text-green-200">{successMessage}</p>
+            </div>
+          )}
+
+          {/* Search */}
+          <div>
+            <input
+              type="text"
+              placeholder="Search creators by username or name..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full rounded-lg border border-gray-700 bg-gray-900 px-4 py-2 text-white placeholder-gray-500 focus:border-brand-500 focus:outline-none"
+            />
+          </div>
+
+          {/* Creator List */}
+          <div className="space-y-3">
+            {filteredCreators.length === 0 ? (
+              <div className="rounded-lg border border-gray-700 bg-gray-900/50 p-8 text-center">
+                <p className="text-gray-400">
+                  {creators.length === 0
+                    ? "No creators found. Verification feature is being populated."
+                    : "No creators matching your search"}
+                </p>
+              </div>
+            ) : (
+              filteredCreators.map((creator) => (
+                <div
+                  key={creator.id}
+                  className="flex items-center justify-between rounded-lg border border-gray-700 bg-gray-900/50 px-6 py-4"
+                >
+                  <div className="flex items-center space-x-4">
+                    {creator.avatarUrl && (
+                      <img
+                        src={creator.avatarUrl}
+                        alt={creator.displayName}
+                        className="h-10 w-10 rounded-full"
+                      />
+                    )}
+                    <div>
+                      <p className="font-semibold text-white">{creator.displayName}</p>
+                      <p className="text-sm text-gray-400">@{creator.username}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center space-x-3">
+                    {creator.blerdartVerified && (
+                      <span className="inline-flex items-center rounded-full bg-blue-900/30 px-3 py-1 text-xs font-medium text-blue-200">
+                        ✓ Verified
+                      </span>
+                    )}
+                    <button
+                      onClick={() =>
+                        handleVerifyCreator(
+                          creator.id,
+                          creator.blerdartVerified
+                        )
+                      }
+                      disabled={verifying === creator.id}
+                      className={`rounded px-4 py-2 text-sm font-medium transition-colors ${
+                        creator.blerdartVerified
+                          ? "border border-red-700 text-red-300 hover:bg-red-900/20 disabled:opacity-50"
                       : "border border-green-700 text-green-300 hover:bg-green-900/20 disabled:opacity-50"
                   }`}
                 >
@@ -224,6 +255,8 @@ export function AdminPanel() {
           </p>
         </div>
       </div>
+        </>
+      )}
     </div>
   );
 }
