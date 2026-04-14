@@ -85,7 +85,7 @@ jobs:
           cd apps/web
           pnpm exec wrangler pages deploy .vercel/output/static || {
             echo "⚠️  Pages deployment failed"
-            echo "Verify the Cloudflare Pages project 'nichestream-web' exists"
+            echo "Verify the Cloudflare Pages project 'videoking' exists"
             echo "See: https://dash.cloudflare.com/pages"
             exit 0
           }
