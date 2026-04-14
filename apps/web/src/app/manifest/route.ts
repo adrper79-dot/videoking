@@ -1,7 +1,5 @@
-import type { MetadataRoute } from "next";
-
-export default function manifest(): MetadataRoute.Manifest {
-  return {
+export async function GET() {
+  const manifest = {
     name: "NicheStream",
     short_name: "NicheStream",
     description: "Hyper-niche interactive video platform",
@@ -39,5 +37,12 @@ export default function manifest(): MetadataRoute.Manifest {
       },
     ],
   };
+
+  return new Response(JSON.stringify(manifest), {
+    headers: {
+      "Content-Type": "application/manifest+json",
+      "Cache-Control": "public, max-age=3600, must-revalidate",
+    },
+  });
 }
 
