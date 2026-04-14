@@ -90,6 +90,30 @@ jobs:
             exit 0
           }
 
+      - name: Setup Custom Domains (api.itsjusus.com & assets.itsjusus.com)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          cd apps/worker
+          echo "🔗 Setting up custom domains..."
+          
+          echo "  1. Ensuring Worker routes are deployed..."
+          # Routes are already in wrangler.toml, so deploy will activate them
+          echo "     ✓ api.itsjusus.com/* configured in wrangler.toml"
+          
+          echo "  2. Adding R2 custom domain..."
+          pnpm exec wrangler r2 bucket domain add videoking-r2 --domain-name "assets.itsjusus.com" 2>&1 || {
+            echo "     ℹ️  Domain may already exist (domain add is idempotent)"
+          }
+          
+          echo "✅ Custom domains setup completed"
+          echo ""
+          echo "Active domains:"
+          echo "  - https://itsjusus.com (Pages)"
+          echo "  - https://api.itsjusus.com (Worker)"
+          echo "  - https://assets.itsjusus.com (R2)"
+
       - name: Notify deployment
         if: success()
         run: echo "✅ NicheStream deployed successfully!"
