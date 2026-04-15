@@ -157,6 +157,7 @@ export class StripeConnectOAuth {
   }> {
     try {
       // Call Stripe API to get account details using connected account token
+      // Stripe account object type not fully exported; interface used instead
       const account = await this._stripe.accounts.retrieve(stripeAccountId, {
         stripeAccount: stripeAccountId,
       } as any);

@@ -76,6 +76,7 @@ assetsRouter.post("/", async (c) => {
 
   try {
     const formData = await c.req.formData();
+    // FormData.get() returns File | string | null; we validate and know it's File in this context
     const file = formData.get("file") as any;
     const category = formData.get("category");
     const tagsStr = formData.get("tags");
@@ -233,4 +234,4 @@ assetsRouter.delete("/:assetId", async (c) => {
   }
 });
 
-export default assetsRouter;
+export { assetsRouter as assetsRoutes };

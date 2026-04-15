@@ -297,10 +297,14 @@ export class VideoRoom {
         const db = createDb(this.env);
         const { chatMessages } = await import("@nichestream/db");
         await db.insert(chatMessages).values({
+          // Type mismatch: DO storage uses string IDs, DB uses UUIDs
           id: chatMsg.id as any,
+          // Type mismatch: DO storage uses string IDs, DB uses UUIDs
           videoId: chatMsg.videoId as any,
+          // Type mismatch: DO storage uses string IDs, DB uses UUIDs
           userId: chatMsg.userId as any,
           content: chatMsg.content,
+          // Type mismatch: DO storage uses string IDs, DB uses UUIDs
           type: chatMsg.type as any,
           isDeleted: chatMsg.isDeleted,
         });
@@ -404,10 +408,14 @@ export class VideoRoom {
         const db = createDb(this.env);
         const { polls } = await import("@nichestream/db");
         await db.insert(polls).values({
+          // Type mismatch: DO storage uses string IDs, DB uses UUIDs
           id: pollId as any,
+          // Type mismatch: DO storage uses string IDs, DB uses UUIDs
           videoId: videoId as any,
+          // Type mismatch: DO storage uses string IDs, DB uses UUIDs
           creatorId: creatorId as any,
           question: pollQuestion,
+          // Type mismatch: DO storage uses string IDs, DB uses UUIDs
           options: pollOptions as any,
           status: "active",
           endsAt: null,
@@ -448,8 +456,11 @@ export class VideoRoom {
         const db = createDb(this.env);
         const { pollVotes } = await import("@nichestream/db");
         await db.insert(pollVotes).values({
+          // Type mismatch: DO storage uses string IDs, DB uses UUIDs
           id: crypto.randomUUID() as any,
+          // Type mismatch: DO storage uses string IDs, DB uses UUIDs
           pollId: activePollId as any,
+          // Type mismatch: DO storage uses string IDs, DB uses UUIDs
           userId: session.userId as any,
           optionId,
         });

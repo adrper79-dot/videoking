@@ -363,6 +363,7 @@ export class PayoutEngine {
       let transferStatus: string | undefined;
 
       const eventType = event.type as string;
+      // Stripe SDK types not exported; use any for webhook event data
       const eventData = event.data.object as any;
 
       if (eventType === "transfer.paid") {
@@ -387,6 +388,7 @@ export class PayoutEngine {
       await this._db
         .update(payoutRuns)
         .set({
+          // Stripe transfer status enum not strictly typed; use any for type coercion
           transferStatus: transferStatus as any,
           updatedAt: new Date(),
           ...(transferStatus === "paid" && { paidAt: new Date() }),
