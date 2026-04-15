@@ -1,21 +1,32 @@
-import { index, pgTable, text, timestamp, uuid, integer } from "drizzle-orm/pg-core";
+import { index, pgTable, text, timestamp, uuid, integer, numeric } from "drizzle-orm/pg-core";
+import { videos } from "./videos";
+import { users } from "./users";
+
+export const ads = pgTable("ads", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  creatorId: uuid("creator_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
 
 export const adEvents = pgTable(
   "ad_events",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    videoId: uuid("video_id").notNull(),
-    creatorId: uuid("creator_id").notNull(),
-    adNetwork: text("ad_network").notNull().default("placeholder"),
-    estimatedRevenueCents: integer("estimated_revenue_cents").default(0),
-    impressionAt: timestamp("impression_at", { withTimezone: true }).defaultNow(),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    adId: uuid("ad_id").references(() => ads.id, { onDelete: "cascade" }),
+    videoId: uuid("video_id").notNull().references(() => videos.id, { onDelete: "cascade" }),
+    creatorId: uuid("creator_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    eventType: text("event_type").notNull(),
+    impressions: integer("impressions").notNull().default(0),
+    clicks: integer("clicks").notNull().default(0),
+    revenue: numeric("revenue", { precision: 12, scale: 4 }).notNull().default("0"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (table) => ({
-    creatorAtIdx: index("idx_ad_events_creator_at").on(table.creatorId, table.impressionAt),
-    videoAtIdx: index("idx_ad_events_video_at").on(table.videoId, table.impressionAt),
-    impressionAtIdx: index("idx_ad_events_impression_at").on(table.impressionAt),
+    videoIdIdx: index("ad_events_video_id_idx").on(table.videoId),
+    creatorIdIdx: index("ad_events_creator_id_idx").on(table.creatorId),
+    adIdIdx: index("ad_events_ad_id_idx").on(table.adId),
+    createdAtIdx: index("ad_events_created_at_idx").on(table.createdAt),
   })
 );
 

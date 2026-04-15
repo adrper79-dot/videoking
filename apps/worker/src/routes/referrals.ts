@@ -11,11 +11,11 @@
  */
 
 import { Hono } from "hono";
-import { eq, desc, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { createDb } from "../lib/db";
 import { createAuth } from "../lib/auth";
 import type { Env } from "../types";
-import { users, referrals, earnings } from "@nichestream/db";
+import { users, referrals } from "@nichestream/db";
 
 const router = new Hono<{ Bindings: Env }>();
 

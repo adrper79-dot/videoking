@@ -4,7 +4,6 @@ import { createDb } from "../lib/db";
 import { createAuth } from "../lib/auth";
 import { notifications } from "@nichestream/db";
 import { eq, and, ne } from "drizzle-orm";
-import type Stripe from "stripe";
 
 const notificationsRouter = new Hono<{ Bindings: Env }>();
 

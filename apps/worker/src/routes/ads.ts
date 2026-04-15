@@ -123,12 +123,18 @@ router.post("/track", async (c) => {
     // Persist ad event with retry logic
     persistWithRetry(
       async () => {
+        const isImpression = body.eventType === "impression" ? 1 : 0;
+        const isClick = body.eventType === "click" ? 1 : 0;
+        const revenueCents = isBillable ? String(estimatedRevenueCents) : "0";
+
         await db.insert(adEvents).values({
           videoId: body.videoId,
           creatorId: video.creatorId,
-          adNetwork: "google_ima",
-          estimatedRevenueCents: isBillable ? estimatedRevenueCents : 0,
-          impressionAt: body.timestamp ? new Date(body.timestamp) : new Date(),
+          eventType: body.eventType,
+          impressions: isImpression,
+          clicks: isClick,
+          revenue: revenueCents,
+          createdAt: body.timestamp ? new Date(body.timestamp) : new Date(),
         });
 
         // If impression and billable, also create earnings entry
@@ -275,11 +281,11 @@ router.get("/metrics/:creatorId", async (c) => {
     // Get total metrics
     const totalsResult = await db
       .select({
-        totalImpressions: sql<number>`COUNT(*)`,
-        totalRevenue: sql<number>`SUM(COALESCE(${adEvents.estimatedRevenueCents}, 0))`,
+        totalImpressions: sql<number>`SUM(COALESCE(${adEvents.impressions}, 0))`,
+        totalRevenue: sql<number>`SUM(COALESCE(${adEvents.revenue}::numeric, 0))`,
       })
       .from(adEvents)
-      .where(and(eq(adEvents.creatorId, creatorId), gte(adEvents.impressionAt, startDate)));
+      .where(and(eq(adEvents.creatorId, creatorId), gte(adEvents.createdAt, startDate)));
 
     const totals = totalsResult[0] || {
       totalImpressions: 0,
@@ -293,13 +299,13 @@ router.get("/metrics/:creatorId", async (c) => {
     const byVideoResult = await db
       .select({
         videoId: adEvents.videoId,
-        impressions: sql<number>`COUNT(*)`,
-        revenue: sql<number>`SUM(COALESCE(${adEvents.estimatedRevenueCents}, 0))`,
+        impressions: sql<number>`SUM(COALESCE(${adEvents.impressions}, 0))`,
+        revenue: sql<number>`SUM(COALESCE(${adEvents.revenue}::numeric, 0))`,
       })
       .from(adEvents)
-      .where(and(eq(adEvents.creatorId, creatorId), gte(adEvents.impressionAt, startDate)))
+      .where(and(eq(adEvents.creatorId, creatorId), gte(adEvents.createdAt, startDate)))
       .groupBy(adEvents.videoId)
-      .orderBy(desc(sql<number>`SUM(COALESCE(${adEvents.estimatedRevenueCents}, 0))`));
+      .orderBy(desc(sql<number>`SUM(COALESCE(${adEvents.revenue}::numeric, 0))`));;
 
     logger.info("metrics_retrieved", {
       creatorId,

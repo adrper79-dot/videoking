@@ -8,12 +8,6 @@ export type EmailTemplate =
   | "payout_milestone"
   | "referral_bonus";
 
-interface EmailData {
-  to: string;
-  template: EmailTemplate;
-  data: Record<string, unknown>;
-}
-
 /**
  * Email service for NicheStream
  * Sends transactional emails via Resend (or provider of choice)

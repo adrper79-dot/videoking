@@ -113,7 +113,6 @@ export class StripeConnectOAuth {
 
       // Store in database
       const { connectedAccounts } = await import("@nichestream/db");
-      const { eq } = await import("drizzle-orm");
 
       await db
         .insert(connectedAccounts)

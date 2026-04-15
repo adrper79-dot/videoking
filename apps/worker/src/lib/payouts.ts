@@ -34,11 +34,9 @@ interface PayoutSummary {
 export class PayoutEngine {
   private _db: ReturnType<typeof createDb>;
   private stripe: Stripe;
-  private _env: Env;
 
-  constructor(db: ReturnType<typeof createDb>, env: Env, stripeClient: Stripe) {
+  constructor(db: ReturnType<typeof createDb>, _env: Env, stripeClient: Stripe) {
     this._db = db;
-    this._env = env;
     this.stripe = stripeClient;
   }
 
