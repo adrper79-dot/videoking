@@ -27,11 +27,12 @@ Hyperdrive provides low-latency connection pooling from Cloudflare Workers to yo
 
 Set these via **Cloudflare dashboard** or `wrangler secret` command:
 
-**Critical Secrets** (use `wrangler secret put`):
+**Critical Secrets** (use `wrangler secret put `):
 ```bash
 pnpm wrangler secret put BETTER_AUTH_SECRET
 pnpm wrangler secret put STRIPE_SECRET_KEY
 pnpm wrangler secret put STRIPE_WEBHOOK_SECRET
+pnpm wrangler secret put APP_BASE_URL  # Frontend URL - environment specific
 ```
 
 **Configuration Variables** (in `wrangler.toml` `[vars]` section):
@@ -41,8 +42,13 @@ pnpm wrangler secret put STRIPE_WEBHOOK_SECRET
 - `STRIPE_CITIZEN_ANNUAL_PRICE` — From Stripe dashboard (Price ID)
 - `STRIPE_VIP_MONTHLY_PRICE` — From Stripe dashboard (Price ID)
 - `STRIPE_CITIZEN_MONTHLY_PRICE` — Price ID for Citizen monthly
-- `APP_BASE_URL` — Your deployment URL (e.g., `https://video.example.com`)
 - `PLATFORM_FEE_PERCENT` — 20 (recommended)
+
+**APP_BASE_URL Configuration:**
+- **Local Development**: Add to `.dev.vars` (e.g., `http://localhost:3000`)
+- **Staging**: `wrangler secret put APP_BASE_URL` with staging URL
+- **Production**: `wrangler secret put APP_BASE_URL` with production URL
+- This must be set for each environment as it's critical for Stripe and auth redirects
 
 ### 3. Stripe Connected Accounts (C-9)
 
