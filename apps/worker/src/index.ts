@@ -169,7 +169,11 @@ app.get("/api/ws/:videoId", async (c) => {
 
 /**
  * GET /api/dashboard/earnings
- * Returns a 30-day earnings summary for the authenticated creator.
+ * Returns paginated earnings records for the authenticated creator.
+ * 
+ * Query params:
+ * - limit: number of records (0-500, default 100)
+ * - offset: records to skip (default 0)
  */
 app.get("/api/dashboard/earnings", async (c) => {
   const db = createDb(c.env);
@@ -181,8 +185,13 @@ app.get("/api/dashboard/earnings", async (c) => {
   }
 
   try {
+    // Parse pagination params
+    const limit = Math.min(parseInt(c.req.query('limit') || '100'), 500); // Max 500
+    const offset = Math.max(parseInt(c.req.query('offset') || '0'), 0);
+
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
+    // Fetch paginated earnings
     const allEarnings = await db
       .select()
       .from(earnings)
@@ -192,8 +201,11 @@ app.get("/api/dashboard/earnings", async (c) => {
           gte(earnings.createdAt, thirtyDaysAgo),
         ),
       )
-      .orderBy(desc(earnings.createdAt));
+      .orderBy(desc(earnings.createdAt))
+      .limit(limit)
+      .offset(offset);
 
+    // Calculate summary from returned records
     const summary = allEarnings.reduce(
       (acc, e) => {
         acc.totalGrossCents += e.grossAmountCents;
@@ -220,7 +232,14 @@ app.get("/api/dashboard/earnings", async (c) => {
       },
     );
 
-    return c.json({ summary, recent: allEarnings.slice(0, 20) });
+    return c.json({
+      summary,
+      records: allEarnings,
+      limit,
+      offset,
+      hasMore: allEarnings.length === limit,
+      note: "Returns up to 500 earnings records; use limit/offset for pagination",
+    });
   } catch (err) {
     console.error("GET /api/dashboard/earnings error:", err);
     return c.json({ error: "InternalError", message: "Failed to fetch earnings" }, 500);
