@@ -1,6 +1,12 @@
 import type { Context } from "hono";
+import type { Env } from "../types";
 import { createDb } from "../lib/db";
 import { createAuth } from "../lib/auth";
+
+interface SessionContextVariables {
+  session: any;
+  user: any;
+}
 
 /**
  * Middleware that enforces authenticated session for any route.
@@ -13,7 +19,7 @@ import { createAuth } from "../lib/auth";
  *   });
  */
 export function requireSession() {
-  return async (c: Context, next: any) => {
+  return async (c: Context<{ Bindings: Env; Variables: SessionContextVariables }>, next: () => Promise<void>) => {
     const db = createDb(c.env);
     const auth = createAuth(db, c.env);
 

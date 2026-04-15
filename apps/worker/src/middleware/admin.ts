@@ -1,14 +1,20 @@
+import type { Context } from "hono";
 import { eq } from "drizzle-orm";
+import type { Env } from "../types";
 import { createDb } from "../lib/db";
 import { createAuth } from "../lib/auth";
 import { users } from "@nichestream/db";
+
+interface AdminContextVariables {
+  adminUser: { role: string; id: string };
+}
 
 /**
  * Middleware that enforces admin-only access.
  * Attaches verified admin role to context.var.adminUser.
  */
 export function requireAdmin() {
-  return async (c: any, next: any) => {
+  return async (c: Context<{ Bindings: Env; Variables: AdminContextVariables }>, next: () => Promise<void>) => {
     const db = createDb(c.env);
     const auth = createAuth(db, c.env);
 
