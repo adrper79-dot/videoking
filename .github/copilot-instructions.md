@@ -14,23 +14,28 @@ Monorepo: **pnpm workspaces + Turborepo**
 ## Always-On Conventions
 
 ### TypeScript
-- Strict mode everywhere. No `any` unless unavoidable with comment.
+- **Strict mode FULLY ENABLED**: `strict: true`, `noUnusedLocals: true`, `noUnusedParameters: true`
+- **No `any` without comment**: Every `as any` cast must have an explanatory comment on the line before it.
+- Unused variables/parameters must be removed; if required by signature, prefix with `_` (e.g., `_unused`).
 - All new shared types go in `packages/types/src/index.ts`.
 - Worker env types live in `apps/worker/src/types.ts` (`Env` interface).
 
 ### Worker (Hono)
 - Routes go under `apps/worker/src/routes/`.
-- All route files must use `const router = new Hono<{ Bindings: Env }>()` and `export default router`.
-- Session validation uses `createAuth(db, env).api.getSession(...)` — never trusting client-supplied identity.
+- All route files follow the pattern: `const router = new Hono<{ Bindings: Env }>()` with `export { router as routerName }` (named exports, not default).
+- Session validation uses `requireSession(c)` middleware or `createAuth(db, env).api.getSession(...)` — never trust client-supplied identity.
 - Never accept payment-related IDs (Stripe account IDs, amounts) from request bodies — always fetch from DB.
-- Prefer `createMiddleware` for cross-cutting concerns (auth, admin checks).
-- `createDb(env)` and `createAuth(db, env)` are per-request — no module-level singletons yet.
+- Middleware for cross-cutting concerns (auth, admin checks) — use `createMiddleware` or inline handlers with proper typing.
+- **Database clients are per-request**: `createDb(env)` creates fresh Drizzle instance each call. NO module-level singletons or caching.
+- **Auth clients are per-request**: `createAuth(db, env)` follows same pattern.
 
 ### Database (Drizzle)
 - Schema files: `packages/db/src/schema/`.
 - All migrations: `packages/db/src/migrations/`.
 - After schema changes, run `pnpm db:generate` then `pnpm db:migrate`.
-- Always add indexes for FK columns and high-frequency query columns.
+- **Index requirement**: All foreign key columns MUST have individual indexes (`index('table_column_idx').on(table.column)`). High-frequency query columns also indexed.
+- Foreign key constraints must include `onDelete` cascade semantics (usually `'cascade'` or `'set null'`).
+- All tables must have timestamps: `createdAt` and `updatedAt` (where appropriate).
 
 ### Frontend (Next.js)
 - Auth client calls go through `apps/web/src/lib/auth-client.ts` (BetterAuth client).
