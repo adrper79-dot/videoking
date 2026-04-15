@@ -105,7 +105,8 @@ adminRouter.post("/verify-creator", requireAdmin(), async (c) => {
 adminRouter.delete("/verify-creator/:userId", requireAdmin(), async (c) => {
   const db = createDb(c.env);
   
-  const userId = c.req.param("userId");
+  // Route parameter userId is always present due to path pattern /verify-creator/:userId
+  const userId = c.req.param("userId")!;
 
   try {
     const [updated] = await db
@@ -131,4 +132,4 @@ adminRouter.delete("/verify-creator/:userId", requireAdmin(), async (c) => {
   }
 });
 
-export default adminRouter;
+export { adminRouter as adminRoutes };

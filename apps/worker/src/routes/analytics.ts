@@ -319,4 +319,4 @@ router.get("/arpu", requireAdmin(), async (c) => {
   }
 });
 
-export default router;
+export { router as analyticsRoutes };

@@ -257,4 +257,4 @@ router.post("/apply", async (c) => {
   }
 });
 
-export default router;
+export { router as referralRoutes };

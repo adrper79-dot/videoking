@@ -10,15 +10,15 @@ import { playlistRoutes } from "./routes/playlists";
 import { stripeRoutes } from "./routes/stripe";
 import { webhookRoutes } from "./routes/webhooks";
 import { moderationRoutes } from "./routes/moderation";
-import adminRouter from "./routes/admin";
-import eventsRouter from "./routes/events";
-import assetsRouter from "./routes/assets";
-import adsRouter from "./routes/ads";
-import referralsRouter from "./routes/referrals";
-import analyticsRouter from "./routes/analytics";
+import { adminRoutes } from "./routes/admin";
+import { eventsRoutes } from "./routes/events";
+import { assetsRoutes } from "./routes/assets";
+import { adRoutes } from "./routes/ads";
+import { referralRoutes } from "./routes/referrals";
+import { analyticsRoutes } from "./routes/analytics";
 import { notificationRoutes } from "./routes/notifications";
 import { emailRoutes } from "./routes/email";
-import searchRouter from "./routes/search";
+import { searchRoutes } from "./routes/search";
 import { VideoRoom } from "./durable-objects/VideoRoom";
 import { UserPresence } from "./durable-objects/UserPresence";
 import { createDb } from "./lib/db";
@@ -112,26 +112,26 @@ app.route("/api/webhooks", webhookRoutes);
 app.route("/api/moderation", moderationRoutes);
 // ─── Admin Routes ─────────────────────────────────────────────────────────────
 
-app.route("/api/admin", adminRouter);
+app.route("/api/admin", adminRoutes);
 
-// ─── Events Routes ────────────────────────────────────────────────────────────
+// ─── Events Routes ────────────────────────────────────────────────────────
 
-app.route("/api/events", eventsRouter);
+app.route("/api/events", eventsRoutes);
 
-// ─── Assets Routes ────────────────────────────────────────────────────────────
+// ─── Assets Routes ────────────────────────────────────────────────────────
 
-app.route("/api/assets", assetsRouter);
-// ─── Ad Routes (Phase 3) ───────────────────────────────────────────────────────
+app.route("/api/assets", assetsRoutes);
+// ─── Ad Routes (Phase 3) ───────────────────────────────────────────────────
 
-app.route("/api/ads", adsRouter);
+app.route("/api/ads", adRoutes);
 
-// ─── Referrals Routes (Phase 4) ────────────────────────────────────────────────
+// ─── Referrals Routes (Phase 4) ────────────────────────────────────────────
 
-app.route("/api/referrals", referralsRouter);
+app.route("/api/referrals", referralRoutes);
 
-// ─── Analytics Routes (Phase 4) ────────────────────────────────────────────────
+// ─── Analytics Routes (Phase 4) ────────────────────────────────────────────
 
-app.route("/api/admin/analytics", analyticsRouter);
+app.route("/api/admin/analytics", analyticsRoutes);
 // ─── Notifications Routes (Phase 4) ────────────────────────────────────────────
 
 app.route("/api/notifications", notificationRoutes);
@@ -142,7 +142,7 @@ app.route("/api/email", emailRoutes);
 
 // ─── Search Routes ────────────────────────────────────────────────────────────
 
-app.route("/api/search", searchRouter);
+app.route("/api/search", searchRoutes);
 
 // ─── WebSocket: upgrade to VideoRoom Durable Object ──────────────────────────
 

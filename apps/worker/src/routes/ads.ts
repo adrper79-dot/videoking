@@ -323,4 +323,4 @@ router.get("/metrics/:creatorId", async (c) => {
   }
 });
 
-export default router;
+export { router as adRoutes };

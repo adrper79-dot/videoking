@@ -161,4 +161,4 @@ eventsRouter.post("/", requireAdmin(), async (c) => {
   }
 });
 
-export default eventsRouter;
+export { eventsRouter as eventsRoutes };
