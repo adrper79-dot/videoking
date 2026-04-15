@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { index, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import { users } from "./users";
 
 export const sessions = pgTable("sessions", {
@@ -12,7 +12,9 @@ export const sessions = pgTable("sessions", {
   userAgent: text("user_agent"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, (table) => ({
+  userIdIdx: index("sessions_user_id_idx").on(table.userId),
+}));
 
 export const accounts = pgTable("accounts", {
   id: text("id").primaryKey(),
@@ -30,7 +32,9 @@ export const accounts = pgTable("accounts", {
   password: text("password"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, (table) => ({
+  userIdIdx: index("accounts_user_id_idx").on(table.userId),
+}));
 
 export const verifications = pgTable("verifications", {
   id: text("id").primaryKey(),

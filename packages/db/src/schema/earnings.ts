@@ -32,6 +32,7 @@ export const earnings = pgTable("earnings", {
 }, (table) => ({
   creatorCreatedAtIdx: index("earnings_creator_created_at_idx").on(table.creatorId, table.createdAt),
   creatorStatusIdx: index("earnings_creator_status_idx").on(table.creatorId, table.status),
+  videoIdIdx: index("earnings_video_id_idx").on(table.videoId),
 }));
 
 export const connectedAccounts = pgTable("connected_accounts", {

@@ -1,4 +1,4 @@
-import { integer, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { index, integer, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { users } from "./users";
 import { videos } from "./videos";
 
@@ -11,7 +11,9 @@ export const playlists = pgTable("playlists", {
   description: text("description"),
   thumbnailUrl: text("thumbnail_url"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, (table) => ({
+  creatorIdIdx: index("playlists_creator_id_idx").on(table.creatorId),
+}));
 
 export const playlistVideos = pgTable("playlist_videos", {
   playlistId: uuid("playlist_id")
@@ -24,4 +26,6 @@ export const playlistVideos = pgTable("playlist_videos", {
   addedAt: timestamp("added_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
   uniquePlaylistVideo: uniqueIndex("playlist_videos_unique_idx").on(table.playlistId, table.videoId),
+  playlistIdIdx: index("playlist_videos_playlist_id_idx").on(table.playlistId),
+  videoIdIdx: index("playlist_videos_video_id_idx").on(table.videoId),
 }));

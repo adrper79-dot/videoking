@@ -35,6 +35,7 @@ export const chatMessages = pgTable("chat_messages", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
   videoIdIdx: index("chat_messages_video_id_idx").on(table.videoId),
+  userIdIdx: index("chat_messages_user_id_idx").on(table.userId),
 }));
 
 // ─── Polls ────────────────────────────────────────────────────────────────────
@@ -54,7 +55,9 @@ export const polls = pgTable("polls", {
   status: pollStatusEnum("status").notNull().default("active"),
   endsAt: timestamp("ends_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, (table) => ({
+  creatorIdIdx: index("polls_creator_id_idx").on(table.creatorId),
+}));
 
 export const pollVotes = pgTable(
   "poll_votes",
@@ -71,6 +74,7 @@ export const pollVotes = pgTable(
   },
   (table) => ({
     pollUserUniqueIdx: uniqueIndex("poll_votes_poll_user_idx").on(table.pollId, table.userId),
+    userIdIdx: index("poll_votes_user_id_idx").on(table.userId),
   }),
 );
 
@@ -95,5 +99,7 @@ export const videoUnlocks = pgTable(
       table.userId,
       table.videoId,
     ),
+    userIdIdx: index("video_unlocks_user_id_idx").on(table.userId),
+    videoIdIdx: index("video_unlocks_video_id_idx").on(table.videoId),
   }),
 );

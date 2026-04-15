@@ -1,4 +1,4 @@
-import { pgEnum, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { index, pgEnum, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import { users } from "./users";
 
 export const contentTypeEnum = pgEnum("content_type", ["video", "chat_message"]);
@@ -20,4 +20,6 @@ export const moderationReports = pgTable("moderation_reports", {
   notes: text("notes"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   resolvedAt: timestamp("resolved_at", { withTimezone: true }),
-});
+}, (table) => ({
+  reporterIdIdx: index("moderation_reports_reporter_id_idx").on(table.reporterId),
+}));

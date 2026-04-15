@@ -1,4 +1,4 @@
-import { pgEnum, pgTable, text, timestamp, uuid, integer } from "drizzle-orm/pg-core";
+import { pgEnum, pgTable, text, timestamp, uuid, integer, index } from "drizzle-orm/pg-core";
 import { users } from "./users";
 
 export const notificationTypeEnum = pgEnum("notification_type", [
@@ -42,4 +42,6 @@ export const notifications = pgTable("notifications", {
   expiresAt: timestamp("expires_at", { withTimezone: true }), // Auto-purge after this date
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, (table) => ({
+  userIdIdx: index("notifications_user_id_idx").on(table.userId),
+}));
