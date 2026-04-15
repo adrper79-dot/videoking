@@ -18,6 +18,11 @@ import { createDb } from "../lib/db";
 import { requireAdmin } from "../middleware/admin";
 import { users, cohortTracking, earnings, churnTracking } from "@nichestream/db";
 
+interface CohortData {
+  cohort_week: string;
+  signups: number;
+}
+
 const router = new Hono<{ Bindings: Env }>();
 
 /**
@@ -72,13 +77,13 @@ router.get("/cohorts", requireAdmin(), async (c) => {
       );
 
     // Aggregate and calculate retention
-    const cohortMap = new Map<string, any>();
+    const cohortMap = new Map<string, CohortData>();
     for (const row of cohortData) {
       const key = row.cohortWeek || 'unknown';
       if (!cohortMap.has(key)) {
         cohortMap.set(key, { cohort_week: key, signups: 0 });
       }
-      const cohort = cohortMap.get(key);
+      const cohort = cohortMap.get(key)!;
       if (row.daysSinceSignup === 0) {
         cohort.signups = Number(row.countUsers) || 0;
       }
