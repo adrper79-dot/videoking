@@ -36,7 +36,7 @@ console.log("🔍 Running pre-deployment checks...\n");
 // ====== 1. Check Environment Variables ======
 console.log("1️⃣  Environment Variables");
 const requiredEnvVars = [
-  "NEXT_PUBLIC_API_URL",
+  "NEXT_PUBLIC_API_BASE_URL",
   "NEXT_PUBLIC_APP_URL",
 ];
 
@@ -144,10 +144,10 @@ try {
     error('Pages wrangler.toml: name should be "videoking"');
   }
 
-  if (content.includes('NEXT_PUBLIC_API_URL')) {
-    success('Pages wrangler.toml: NEXT_PUBLIC_API_URL configured');
+  if (content.includes('NEXT_PUBLIC_API_BASE_URL')) {
+    success('Pages wrangler.toml: NEXT_PUBLIC_API_BASE_URL configured');
   } else {
-    warn('Pages wrangler.toml: NEXT_PUBLIC_API_URL not in wrangler.toml');
+    warn('Pages wrangler.toml: NEXT_PUBLIC_API_BASE_URL not in wrangler.toml');
   }
 } catch (e) {
   error(`Cannot read pages wrangler.toml: ${e.message}`);
@@ -182,11 +182,11 @@ try {
   const content = fs.readFileSync(workflowPath, "utf8");
 
   if (content.includes("pnpm build:pages")) {
-    if (content.includes("NEXT_PUBLIC_API_URL")) {
-      success("Deploy workflow sets NEXT_PUBLIC_API_URL during build");
+    if (content.includes("NEXT_PUBLIC_API_BASE_URL")) {
+      success("Deploy workflow sets NEXT_PUBLIC_API_BASE_URL during build");
     } else {
       error(
-        "Deploy workflow: Build step doesn't set NEXT_PUBLIC_API_URL\n" +
+        "Deploy workflow: Build step doesn't set NEXT_PUBLIC_API_BASE_URL\n" +
         "       → Frontend will use localhost fallback in production"
       );
     }

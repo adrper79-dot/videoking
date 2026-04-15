@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { RoomState, WSMessage, WSMessageType } from "@nichestream/types";
 
 const WS_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL?.replace(/^http/, "ws") ?? "ws://localhost:8787";
+  process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/^http/, "ws") ?? "ws://localhost:8787";
 
 interface UseWebSocketOptions {
   videoId: string;
