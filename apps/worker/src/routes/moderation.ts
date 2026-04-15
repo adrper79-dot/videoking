@@ -77,7 +77,8 @@ moderationRouter.get("/reports", requireAdmin(), async (c) => {
  */
 moderationRouter.patch("/reports/:id", requireAdmin(), async (c) => {
   const db = createDb(c.env);
-  const reportId = c.req.param("id");
+  // Route parameter id is always present due to path pattern /reports/:id
+  const reportId = c.req.param("id")!;
 
   try {
     const body = await c.req.json<{
