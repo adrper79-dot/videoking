@@ -1,4 +1,4 @@
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { eq, desc, sql, and, gte } from "drizzle-orm";
 import type { Env } from "../types";
 import { createDb } from "../lib/db";
@@ -162,7 +162,7 @@ async function handleAdTrack(
   videoId: string,
   eventType: string,
   timestamp: string | undefined,
-  c: Parameters<typeof createLogger>[0],
+  c: Context,
 ): Promise<Response> {
   const logger = createLogger(c, { operation: "ads_track" });
 
@@ -229,7 +229,7 @@ async function handleAdTrack(
  * POST /api/ads/track
  *
  * Track ad events from IMA SDK integration (JSON body).
- * Requires authentication to prevent earnings fraud.
+ * Requires authentication to prevent earnings fraud from direct API calls.
  */
 router.post("/track", requireSession(), async (c) => {
   try {
@@ -249,10 +249,13 @@ router.post("/track", requireSession(), async (c) => {
 /**
  * GET /api/ads/track
  *
- * Track ad events fired by VAST 4.0 tracking pixels (GET requests from IMA SDK/browser).
- * Requires authentication to prevent earnings fraud.
+ * Track ad events fired by VAST 4.0 tracking pixels.
+ * VAST <Impression> and <TrackingEvents> fire unauthenticated GET requests from the
+ * browser/IMA SDK, so session auth cannot be required here.
+ * Fraud mitigation: events are validated against existing video IDs and earnings are
+ * credited at fractions of a cent per call, limiting blast radius.
  */
-router.get("/track", requireSession(), async (c) => {
+router.get("/track", async (c) => {
   try {
     const videoId = c.req.query("videoId") ?? "";
     const eventType = c.req.query("type") ?? "";

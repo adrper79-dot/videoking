@@ -142,7 +142,8 @@ export class VideoRoom {
     // Send current room state immediately after connect
     this.sendRoomState(server);
 
-    // Broadcast user joined
+    // Broadcast user joined — compute connected count once from the runtime socket list.
+    const connectedCount = this.state.getWebSockets().length;
     this.broadcast(
       {
         type: "user_presence",
@@ -152,7 +153,7 @@ export class VideoRoom {
           username,
           avatarUrl,
           userTier,
-          connectedCount: this.state.getWebSockets().length,
+          connectedCount,
         },
         timestamp: new Date().toISOString(),
       },
@@ -213,6 +214,7 @@ export class VideoRoom {
     this.sessions.delete(sessionKey);
 
     if (session) {
+      const connectedCount = this.state.getWebSockets().length;
       this.broadcast({
         type: "user_presence",
         payload: {
@@ -220,7 +222,7 @@ export class VideoRoom {
           userId,
           username: session.username,
           userTier: session.userTier,
-          connectedCount: this.state.getWebSockets().length,
+          connectedCount,
         },
         timestamp: new Date().toISOString(),
       });
@@ -539,10 +541,11 @@ export class VideoRoom {
 
   /** Send the full room state to a newly connected WebSocket. */
   private sendRoomState(ws: WebSocket): void {
+    const connectedCount = this.state.getWebSockets().length;
     const stateMsg: WSMessage = {
       type: "room_state",
       payload: {
-        connectedCount: this.state.getWebSockets().length,
+        connectedCount,
         recentMessages: this.chatHistory.slice(-50),
         activePoll: this.activePoll,
         reactionCounts: Object.fromEntries(this.reactionCounts),
@@ -572,7 +575,8 @@ export class VideoRoom {
   }
 
   private getVideoIdFromSessions(): string | null {
-    const firstSocket = this.state.getWebSockets()[0];
+    const allSockets = this.state.getWebSockets();
+    const firstSocket = allSockets[0];
     if (!firstSocket) return null;
     const tags = this.state.getTags(firstSocket);
     return tags[4] ?? null;
@@ -581,9 +585,9 @@ export class VideoRoom {
   /** Broadcast a message to all connected sessions, optionally excluding one. */
   private broadcast(msg: WSMessage, excludeUserId?: string): void {
     const payload = JSON.stringify(msg);
-    // Use state.getWebSockets() to reach all sockets including hibernated ones.
-    // This is safe across DO hibernation — state.getWebSockets() always returns the full set.
-    for (const ws of this.state.getWebSockets()) {
+    // Fetch the socket list once and reuse for both iteration and count.
+    const allSockets = this.state.getWebSockets();
+    for (const ws of allSockets) {
       const tags = this.state.getTags(ws);
       const wsUserId = tags[0];
       if (wsUserId === excludeUserId) continue;

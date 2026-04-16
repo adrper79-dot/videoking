@@ -152,5 +152,6 @@ export function persistWithRetry(
     });
   };
 
-  runWithRetries();
+  // Fire-and-forget: errors are fully handled inside runWithRetries via console.error.
+  void runWithRetries();
 }

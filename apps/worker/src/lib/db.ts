@@ -4,41 +4,21 @@ import * as schema from "@nichestream/db";
 import type { Env } from "../types";
 
 /**
- * Per-isolate DB client cache. Cloudflare Workers reuse the same isolate across
- * many requests, so caching at module scope avoids re-initialising the postgres
- * client (and burning Hyperdrive connections) on every request.
- *
- * The cache is keyed by connection string so that workers with different Hyperdrive
- * bindings (e.g. staging vs. production) never share a client.
- *
- * Cache eviction: entries persist for the lifetime of the isolate. Cloudflare
- * evicts isolates automatically when idle or when a new deployment is published.
- * There is no manual eviction needed — each new deployment gets a fresh isolate
- * and therefore a fresh connection pool.
- */
-const clientCache = new Map<string, ReturnType<typeof drizzle>>();
-
-/**
- * Returns a Drizzle ORM client connected via Cloudflare Hyperdrive.
- * Subsequent calls from the same isolate with the same connection string return
- * the cached instance instead of opening a new postgres pool.
+ * Creates a Drizzle ORM client connected via Cloudflare Hyperdrive.
+ * Hyperdrive wraps the Neon connection string with connection pooling,
+ * so each call creates a lightweight postgres.js client backed by the
+ * Hyperdrive proxy — actual TCP connections are managed by Hyperdrive,
+ * not by the per-request client.
  */
 export function createDb(env: Env) {
-  const connectionString = env.DB.connectionString;
-
-  const cached = clientCache.get(connectionString);
-  if (cached) return cached;
-
-  const connection = postgres(connectionString, {
-    // Hyperdrive manages the external pool; keep isolate-side pool small.
+  const connection = postgres(env.DB.connectionString, {
+    // Hyperdrive manages the external pool; limit isolate-side concurrency.
     max: 5,
-    // Disable prefetching since we use Hyperdrive's pool
+    // Disable prefetching since we use Hyperdrive's pool.
     fetch_types: false,
   });
 
-  const db = drizzle(connection, { schema });
-  clientCache.set(connectionString, db);
-  return db;
+  return drizzle(connection, { schema });
 }
 
 export type DrizzleClient = ReturnType<typeof createDb>;
