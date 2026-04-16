@@ -198,6 +198,7 @@ router.get("/track", requireSession(), async (c) => {
 router.get("/ad-tag", async (c) => {
   const adVideoUrl = c.env.AD_VIDEO_URL;
   if (!adVideoUrl) {
+    // generateEmptyVast is a hoisted function declaration — available throughout the module.
     return c.text(generateEmptyVast(), 200, { "Content-Type": "application/xml" });
   }
   return c.redirect(adVideoUrl, 302);
