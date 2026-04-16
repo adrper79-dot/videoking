@@ -1,5 +1,25 @@
 import type { Env } from "../types";
 
+/**
+ * Generate a signed unsubscribe token for a user.
+ * Format: base64(userId:expiry:HMAC-SHA256(userId+":"+expiry, BETTER_AUTH_SECRET))
+ * Expiry defaults to 30 days from now.
+ */
+export async function generateUnsubscribeToken(userId: string, env: Env): Promise<string> {
+  const expiry = (Date.now() + 30 * 24 * 60 * 60 * 1000).toString();
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(env.BETTER_AUTH_SECRET),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const sigBuffer = await crypto.subtle.sign("HMAC", key, encoder.encode(`${userId}:${expiry}`));
+  const sig = Buffer.from(sigBuffer).toString("hex");
+  return Buffer.from(`${userId}:${expiry}:${sig}`).toString("base64");
+}
+
 export type EmailTemplate = 
   | "trial_ending"
   | "trial_ended"

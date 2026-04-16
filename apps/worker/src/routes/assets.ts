@@ -149,12 +149,19 @@ assetsRouter.post("/", async (c) => {
 
 /**
  * GET /assets/:assetId/download
- * Download creator asset (increment download counter).
+ * Download creator asset (requires authentication; increments download counter).
  */
 assetsRouter.get("/:assetId/download", async (c) => {
   const db = createDb(c.env);
+  const auth = createAuth(db, c.env);
   const r2 = createR2(c.env);
   const assetId = c.req.param("assetId");
+
+  // Require authentication — assets may be paid digital goods
+  const session = await auth.api.getSession({ headers: c.req.raw.headers });
+  if (!session?.user) {
+    return c.json({ error: "Unauthorized", message: "Authentication required to download assets" }, 401);
+  }
 
   try {
     const [asset] = await db

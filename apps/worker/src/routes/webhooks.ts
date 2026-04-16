@@ -126,6 +126,48 @@ webhooksRouter.post("/stripe", async (c) => {
         break;
       }
 
+      default: {
+        // Handle transfer status events that are not in Stripe's TypeScript union
+        // but are valid webhook events when enabled in the Stripe Dashboard.
+        const eventType = event.type as string;
+
+        if (eventType === "transfer.paid" || eventType === "transfer.failed") {
+          const transfer = (event as { data: { object: Stripe.Transfer } }).data.object;
+          const { payoutRuns } = await import("@nichestream/db");
+          if (eventType === "transfer.paid") {
+            await db
+              .update(payoutRuns)
+              .set({ transferStatus: "paid", paidAt: new Date(), updatedAt: new Date() })
+              .where(eq(payoutRuns.stripeTransferId, transfer.id));
+          } else {
+            await db
+              .update(payoutRuns)
+              .set({
+                transferStatus: "failed",
+                failedReason: "Transfer failed via Stripe webhook",
+                updatedAt: new Date(),
+              })
+              .where(eq(payoutRuns.stripeTransferId, transfer.id));
+          }
+        }
+        break;
+      }
+
+      case "invoice.payment_succeeded": {
+        // Fires on every successful subscription renewal (NOT on the initial invoice —
+        // that's covered by customer.subscription.created). We skip billing_reason ===
+        // "subscription_create" to avoid double-counting the first payment.
+        const invoice = event.data.object as Stripe.Invoice;
+        if (
+          invoice.billing_reason === "subscription_cycle" &&
+          invoice.subscription &&
+          typeof invoice.subscription === "string"
+        ) {
+          await handleInvoiceRenewal(db, stripe, invoice, platformFeePercent);
+        }
+        break;
+      }
+
       case "customer.subscription.trial_will_end": {
         const sub = event.data.object as Stripe.Subscription;
         // Find the subscriber user to send trial ending notification
@@ -173,9 +215,6 @@ webhooksRouter.post("/stripe", async (c) => {
         }
         break;
       }
-
-      default:
-        break;
     }
 
     return c.json({ received: true });
@@ -330,6 +369,72 @@ async function refreshUserMembershipState(
   await syncUserMembershipStatus(db, subscriberId, {
     userTier: "free",
     subscriptionStatus: nextStatus,
+  });
+}
+
+/**
+ * Handle invoice.payment_succeeded for subscription renewals.
+ * Stripe fires this event on every billing cycle after the initial subscription creation.
+ * We insert an earnings record for the renewal amount so creators are credited each month.
+ *
+ * NOTE: The following events must be enabled in the Stripe Dashboard webhook configuration:
+ *   - customer.subscription.created
+ *   - customer.subscription.updated
+ *   - customer.subscription.deleted
+ *   - customer.subscription.trial_will_end
+ *   - payment_intent.succeeded
+ *   - transfer.created
+ *   - transfer.paid
+ *   - transfer.failed
+ *   - invoice.payment_succeeded   ← Required for renewal earnings
+ */
+async function handleInvoiceRenewal(
+  db: ReturnType<typeof createDb>,
+  stripe: Stripe,
+  invoice: Stripe.Invoice,
+  platformFeePercent: number,
+): Promise<void> {
+  const subscriptionId = typeof invoice.subscription === "string" ? invoice.subscription : invoice.subscription?.id;
+  if (!subscriptionId) return;
+
+  const [subRecord] = await db
+    .select({ creatorId: subscriptions.creatorId, subscriberId: subscriptions.subscriberId })
+    .from(subscriptions)
+    .where(eq(subscriptions.stripeSubscriptionId, subscriptionId))
+    .limit(1);
+
+  if (!subRecord?.creatorId) {
+    // Try to fetch the subscription from Stripe to get metadata
+    const stripeSub = await stripe.subscriptions.retrieve(subscriptionId);
+    const { creatorId } = stripeSub.metadata ?? {};
+    if (!creatorId) return;
+
+    const grossAmountCents = invoice.amount_paid;
+    if (grossAmountCents <= 0) return;
+
+    const { platformFeeCents, netAmountCents } = calculateFees(grossAmountCents, platformFeePercent);
+    await db.insert(earnings).values({
+      creatorId,
+      type: "subscription_share",
+      grossAmountCents,
+      platformFeeCents,
+      netAmountCents,
+      status: "pending",
+    });
+    return;
+  }
+
+  const grossAmountCents = invoice.amount_paid;
+  if (grossAmountCents <= 0) return;
+
+  const { platformFeeCents, netAmountCents } = calculateFees(grossAmountCents, platformFeePercent);
+  await db.insert(earnings).values({
+    creatorId: subRecord.creatorId,
+    type: "subscription_share",
+    grossAmountCents,
+    platformFeeCents,
+    netAmountCents,
+    status: "pending",
   });
 }
 

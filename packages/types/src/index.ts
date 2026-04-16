@@ -167,6 +167,7 @@ export type WSMessageType =
   | "poll_vote"
   | "poll_update"
   | "watch_party_sync"
+  | "watch_party_host_left"
   | "user_presence"
   | "error"
   | "room_state";

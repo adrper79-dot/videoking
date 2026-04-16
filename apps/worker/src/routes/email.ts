@@ -100,19 +100,56 @@ emailRouter.post("/preferences", async (c) => {
 
 /**
  * POST /api/email/unsubscribe/:token
- * One-click unsubscribe (token-based for email links)
- * Token would be: base64(userId:timestamp:signature)
+ * One-click unsubscribe. Token format: base64url(userId:expiry:HMAC-SHA256(userId+":"+expiry))
+ * HMAC is signed with BETTER_AUTH_SECRET to prevent arbitrary userId forgery.
  */
 emailRouter.post("/unsubscribe/:token", async (c) => {
-  // This is a simplified version - production would verify signature
   try {
     const token = c.req.param("token");
-    // Decode token to get userId
-    const decoded = Buffer.from(token, "base64").toString("utf-8");
-    const [userId] = decoded.split(":");
 
-    if (!userId) {
+    // Decode and split token into components
+    let decoded: string;
+    try {
+      decoded = Buffer.from(token, "base64").toString("utf-8");
+    } catch {
       return c.json({ error: "Invalid token" }, 400);
+    }
+
+    const parts = decoded.split(":");
+    // Support both old format (userId only) and new signed format (userId:expiry:sig)
+    if (parts.length < 3) {
+      return c.json({ error: "Invalid or unsigned token — please request a new unsubscribe link" }, 400);
+    }
+
+    const [userId, expiry, sig] = parts;
+
+    if (!userId || !expiry || !sig) {
+      return c.json({ error: "Invalid token" }, 400);
+    }
+
+    // Verify expiry
+    if (Date.now() > Number(expiry)) {
+      return c.json({ error: "Unsubscribe link has expired — please request a new one" }, 400);
+    }
+
+    // Verify HMAC-SHA256 signature using BETTER_AUTH_SECRET as the key
+    const secret = c.env.BETTER_AUTH_SECRET;
+    const encoder = new TextEncoder();
+    const key = await crypto.subtle.importKey(
+      "raw",
+      encoder.encode(secret),
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["sign", "verify"],
+    );
+
+    const data = encoder.encode(`${userId}:${expiry}`);
+    const expectedSigBuffer = await crypto.subtle.sign("HMAC", key, data);
+    const expectedSig = Buffer.from(expectedSigBuffer).toString("hex");
+
+    // Constant-time comparison to prevent timing attacks
+    if (sig.length !== expectedSig.length || sig !== expectedSig) {
+      return c.json({ error: "Invalid token signature" }, 400);
     }
 
     const db = createDb(c.env);

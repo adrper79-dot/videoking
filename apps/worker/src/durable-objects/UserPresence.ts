@@ -1,4 +1,7 @@
 import type { DurableObjectState, WebSocket } from "@cloudflare/workers-types";
+import { createDb } from "../lib/db";
+import { createAuth } from "../lib/auth";
+import type { Env } from "../types";
 
 interface PresenceEntry {
   userId: string;
@@ -13,11 +16,13 @@ interface PresenceEntry {
  */
 export class UserPresence {
   private readonly state: DurableObjectState;
+  private readonly env: Env;
   private sessions: Set<WebSocket> = new Set();
   private presenceData: PresenceEntry | null = null;
 
-  constructor(state: DurableObjectState) {
+  constructor(state: DurableObjectState, env: Env) {
     this.state = state;
+    this.env = env;
     this.state.blockConcurrencyWhile(async () => {
       const stored = await this.state.storage.get<PresenceEntry>("presence");
       if (stored) this.presenceData = stored;
@@ -25,13 +30,19 @@ export class UserPresence {
   }
 
   async fetch(request: Request): Promise<Response> {
-    const url = new URL(request.url);
-
     // WebSocket connection to track real-time presence
     if (request.headers.get("Upgrade")?.toLowerCase() === "websocket") {
-      const userId = url.searchParams.get("userId") ?? "anonymous";
-      const username = url.searchParams.get("username") ?? "Guest";
-      const avatarUrl = url.searchParams.get("avatarUrl") ?? null;
+      const db = createDb(this.env);
+      const auth = createAuth(db, this.env);
+      const session = await auth.api.getSession({ headers: request.headers });
+
+      if (!session?.user) {
+        return new Response("Unauthorized", { status: 401 });
+      }
+
+      const userId = session.user.id;
+      const username = session.user.name ?? session.user.email ?? "Guest";
+      const avatarUrl = session.user.image ?? null;
 
       const [client, server] = Object.values(new WebSocketPair()) as [WebSocket, WebSocket];
       this.state.acceptWebSocket(server, [userId]);

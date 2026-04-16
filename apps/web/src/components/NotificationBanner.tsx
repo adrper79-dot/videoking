@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api";
+import { useEntitlements } from "@/components/EntitlementsContext";
 
 export interface Notification {
   id: string;
@@ -16,17 +17,22 @@ export interface Notification {
 }
 
 /**
- * Fetches and displays pending notifications to the user
- * Shows urgent notifications prominently, others as dismissible banners
- * Updates status to 'shown' when displayed, tracks dismissal
+ * Fetches and displays pending notifications to the user.
+ * Only fetches when the user is authenticated (no unnecessary 401s for public pages).
  */
 export function NotificationBanner() {
+  const { entitlements } = useEntitlements();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
 
-  // Fetch notifications on mount
+  // Fetch notifications only for authenticated users
   useEffect(() => {
+    if (!entitlements?.authenticated) {
+      setLoading(false);
+      return;
+    }
+
     const fetchNotifications = async () => {
       try {
         setLoading(true);
@@ -40,7 +46,7 @@ export function NotificationBanner() {
     };
 
     void fetchNotifications();
-  }, []);
+  }, [entitlements?.authenticated]);
 
   const handleDismiss = async (notificationId: string) => {
     setDismissed((prev) => new Set(prev).add(notificationId));

@@ -11,7 +11,7 @@
  */
 
 import { Hono } from "hono";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { createDb } from "../lib/db";
 import { createAuth } from "../lib/auth";
 import type { Env } from "../types";
@@ -165,28 +165,36 @@ router.get("/stats", async (c) => {
 
 /**
  * POST /api/referrals/apply
- * Apply a referral code during sign-up
- * 
+ * Apply a referral code. The caller must be authenticated; the referred user is
+ * always the currently-signed-in user (not a client-supplied `user_id`).
+ *
  * Request:
- * { referral_code: "user_123_ABC123", user_id: "new_user_id" }
- * 
+ * { referral_code: "user_123_ABC123" }
+ *
  * Side effects:
- * - Validate referral code exists and is not expired
- * - Grant both users 7 extra trial days OR credit bonus
- * - Create earning records for both users
+ * - Validates code is pending and not expired
+ * - Prevents self-referral
+ * - Grants both users trial extension and credit bonus (via SQL increment)
  */
 router.post("/apply", async (c) => {
   try {
-    const { referral_code, user_id } = await c.req.json<{
-      referral_code: string;
-      user_id: string;
-    }>();
+    const db = createDb(c.env);
+    const auth = createAuth(db, c.env);
+    const session = await auth.api.getSession({ headers: c.req.raw.headers });
 
-    if (!referral_code || !user_id) {
-      return c.json({ error: "Missing referral_code or user_id" }, 400);
+    if (!session?.user?.id) {
+      return c.json({ error: "Unauthorized" }, 401);
     }
 
-    const db = createDb(c.env);
+    const userId = session.user.id;
+
+    const { referral_code } = await c.req.json<{
+      referral_code: string;
+    }>();
+
+    if (!referral_code) {
+      return c.json({ error: "Missing referral_code" }, 400);
+    }
 
     // Query referrals table for matching code
     const [referral] = await db
@@ -197,6 +205,11 @@ router.post("/apply", async (c) => {
 
     if (!referral) {
       return c.json({ error: "Referral code not found" }, 404);
+    }
+
+    // Prevent self-referral
+    if (referral.referredByUserId === userId) {
+      return c.json({ error: "You cannot use your own referral code" }, 400);
     }
 
     // Validate referral is still pending (not already used or expired)
@@ -218,38 +231,39 @@ router.post("/apply", async (c) => {
     await db
       .update(referrals)
       .set({
-        referredUserId: user_id,
+        referredUserId: userId,
         conversionStatus: "trial_started",
         signedUpAt: new Date(),
         updatedAt: new Date(),
       })
       .where(eq(referrals.id, referral.id));
 
-    // Grant trial extension (7 days) to both users via account_credits_cents
     const creditBonus = referral.creditBonusCents || 0;
+    const trialDays = referral.trialDaysBonus || 7;
+
+    // Grant trial extension and credit bonus to referred user (increment credits, don't overwrite)
     await db
       .update(users)
       .set({
-        accountCreditsCents: creditBonus,
-        trialExtendedDays: (referral.trialDaysBonus || 7),
+        accountCreditsCents: sql`COALESCE(account_credits_cents, 0) + ${creditBonus}`,
+        trialExtendedDays: trialDays,
       })
-      .where(eq(users.id, user_id));
+      .where(eq(users.id, userId));
 
-    // Also grant bonus to referrer
-    await db
-      .update(users)
-      .set({
-        accountCreditsCents: creditBonus,
-      })
-      .where(eq(users.id, referral.referredByUserId));
-
-    // Create earnings records for referral bonus (future use)
-    // Future: Award credits as earnings_type='referral_bonus'
+    // Grant credit bonus to referrer (increment, don't overwrite)
+    if (creditBonus > 0) {
+      await db
+        .update(users)
+        .set({
+          accountCreditsCents: sql`COALESCE(account_credits_cents, 0) + ${creditBonus}`,
+        })
+        .where(eq(users.id, referral.referredByUserId));
+    }
 
     return c.json({
       success: true,
       message: "Referral applied successfully",
-      bonus: `${referral.trialDaysBonus || 7} extra trial days granted`,
+      bonus: `${trialDays} extra trial days granted`,
     });
   } catch (error) {
     console.error("Error applying referral:", error);

@@ -186,15 +186,19 @@ stripeRouter.post("/subscriptions", async (c) => {
       return c.json({ error: "ValidationError", message: "Unexpected price selected" }, 400);
     }
 
-    // Fetch creator username for cancel_url and their Stripe account for revenue routing
+    // Fetch creator — must exist and have creator role
     const [creator] = await db
-      .select({ username: users.username })
+      .select({ username: users.username, role: users.role })
       .from(users)
       .where(eq(users.id, body.creatorId))
       .limit(1);
 
     if (!creator) {
       return c.json({ error: "NotFound", message: "Creator not found" }, 404);
+    }
+
+    if (creator.role !== "creator" && creator.role !== "admin") {
+      return c.json({ error: "BadRequest", message: "Target user is not a creator" }, 400);
     }
 
     const checkoutSession = await stripe.checkout.sessions.create({

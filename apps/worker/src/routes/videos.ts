@@ -179,11 +179,20 @@ videosRouter.get("/:id", async (c) => {
       }
     }
 
-    // Increment view count asynchronously
-    void db
-      .update(videos)
-      .set({ viewsCount: sql`${videos.viewsCount} + 1` })
-      .where(eq(videos.id, videoId));
+    // Increment view count for public views only (not owner, not deleted/unlisted).
+    // Load session lazily — already loaded above for non-public videos.
+    const shouldIncrementViews = video.visibility === "public" && video.status !== "deleted";
+    if (shouldIncrementViews) {
+      // Avoid counting the creator's own views by checking session (best-effort, unauthenticated OK).
+      const auth = createAuth(db, c.env);
+      const viewerSession = await auth.api.getSession({ headers: c.req.raw.headers });
+      if (!viewerSession || viewerSession.user.id !== video.creatorId) {
+        void db
+          .update(videos)
+          .set({ viewsCount: sql`${videos.viewsCount} + 1` })
+          .where(eq(videos.id, videoId));
+      }
+    }
 
     return c.json({
       ...video,
@@ -280,6 +289,13 @@ videosRouter.patch("/:id", async (c) => {
       description?: string;
       visibility?: "public" | "subscribers_only" | "unlocked_only";
       status?: "ready" | "unlisted";
+      tags?: string[];
+      style?: "digital" | "traditional" | "mixed_media" | "3d";
+      tool?: "procreate" | "clip_studio" | "photoshop" | "krita" | "affinity" | "blender" | "maya" | "traditional_media" | "other";
+      genre?: "animation" | "comic" | "illustration" | "character_design" | "concept_art" | "afro_fantasy" | "sci_fi" | "animation_short" | "process_video" | "tutorial" | "speedart" | "other";
+      eventId?: string | null;
+      humanCreatedAffirmed?: boolean;
+      watermarkEnabled?: boolean;
     }>();
 
     // Validate title is not blank if provided
@@ -290,11 +306,27 @@ videosRouter.patch("/:id", async (c) => {
     // Validate enum values
     const VALID_VISIBILITY = new Set(["public", "subscribers_only", "unlocked_only"]);
     const VALID_STATUS = new Set(["ready", "unlisted"]);
+    const VALID_STYLE = new Set(["digital", "traditional", "mixed_media", "3d"]);
+    const VALID_TOOL = new Set(["procreate", "clip_studio", "photoshop", "krita", "affinity", "blender", "maya", "traditional_media", "other"]);
+    const VALID_GENRE = new Set(["animation", "comic", "illustration", "character_design", "concept_art", "afro_fantasy", "sci_fi", "animation_short", "process_video", "tutorial", "speedart", "other"]);
+
     if (body.visibility !== undefined && !VALID_VISIBILITY.has(body.visibility)) {
       return c.json({ error: "BadRequest", message: "Invalid visibility value" }, 400);
     }
     if (body.status !== undefined && !VALID_STATUS.has(body.status)) {
       return c.json({ error: "BadRequest", message: "Invalid status value" }, 400);
+    }
+    if (body.style !== undefined && !VALID_STYLE.has(body.style)) {
+      return c.json({ error: "BadRequest", message: "Invalid style value" }, 400);
+    }
+    if (body.tool !== undefined && !VALID_TOOL.has(body.tool)) {
+      return c.json({ error: "BadRequest", message: "Invalid tool value" }, 400);
+    }
+    if (body.genre !== undefined && !VALID_GENRE.has(body.genre)) {
+      return c.json({ error: "BadRequest", message: "Invalid genre value" }, 400);
+    }
+    if (body.tags !== undefined && (!Array.isArray(body.tags) || body.tags.some((t) => typeof t !== "string"))) {
+      return c.json({ error: "BadRequest", message: "tags must be an array of strings" }, 400);
     }
 
     const [updated] = await db
@@ -304,6 +336,13 @@ videosRouter.patch("/:id", async (c) => {
         ...(body.description !== undefined && { description: body.description.trim().slice(0, 5000) }),
         ...(body.visibility !== undefined && { visibility: body.visibility }),
         ...(body.status !== undefined && { status: body.status }),
+        ...(body.tags !== undefined && { tags: body.tags.slice(0, 20).map((t) => t.trim().slice(0, 50)) }),
+        ...(body.style !== undefined && { style: body.style }),
+        ...(body.tool !== undefined && { tool: body.tool }),
+        ...(body.genre !== undefined && { genre: body.genre }),
+        ...("eventId" in body && { eventId: body.eventId ?? null }),
+        ...(body.humanCreatedAffirmed !== undefined && { humanCreatedAffirmed: body.humanCreatedAffirmed }),
+        ...(body.watermarkEnabled !== undefined && { watermarkEnabled: body.watermarkEnabled }),
         updatedAt: new Date(),
         ...(body.status === "ready" && { publishedAt: new Date() }),
       })

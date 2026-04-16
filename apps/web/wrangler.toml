@@ -6,3 +6,8 @@ pages_build_output_dir = ".vercel/output/static"
 [vars]
 NEXT_PUBLIC_API_BASE_URL = "https://api.itsjusus.com"
 NEXT_PUBLIC_APP_URL = "https://itsjusus.com"
+# Worker WebSocket base URL used by the ad manager
+NEXT_PUBLIC_WORKER_URL = "https://api.itsjusus.com"
+# Subscription price display (shown in SubscribeButton; not secret)
+NEXT_PUBLIC_SUBSCRIPTION_PRICE_MONTHLY = "1.00"
+NEXT_PUBLIC_SUBSCRIPTION_PRICE_ANNUAL = "10.00"

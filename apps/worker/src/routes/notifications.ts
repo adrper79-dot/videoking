@@ -13,14 +13,14 @@ const notificationsRouter = new Hono<{ Bindings: Env }>();
  * Marks pending notifications as 'shown' on fetch
  */
 notificationsRouter.get("/", async (c) => {
-  const auth = createAuth(createDb(c.env), c.env);
+  const db = createDb(c.env);
+  const auth = createAuth(db, c.env);
   const session = await auth.api.getSession({ headers: c.req.raw.headers });
 
   if (!session?.user?.id) {
     return c.json({ error: "Unauthorized" }, 401);
   }
 
-  const db = createDb(c.env);
   const userId = session.user.id;
 
   try {

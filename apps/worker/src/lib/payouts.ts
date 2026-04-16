@@ -273,6 +273,30 @@ export class PayoutEngine {
     }
 
     try {
+      // Idempotency: check if a payout_run already exists for this creator and period.
+      // This prevents double-payment if the cron fires more than once in the same month.
+      const periodStart = new Date(year, month - 1, 1);
+      const periodEnd = new Date(year, month, 1);
+      const periodStartStr = periodStart.toISOString().split("T")[0];
+      const periodEndStr = periodEnd.toISOString().split("T")[0];
+
+      const [existingRun] = await this._db
+        .select({ id: payoutRuns.id })
+        .from(payoutRuns)
+        .where(
+          and(
+            eq(payoutRuns.creatorId, summary.creator_id),
+            eq(payoutRuns.payoutPeriodStart, periodStartStr),
+            eq(payoutRuns.payoutPeriodEnd, periodEndStr),
+          ),
+        )
+        .limit(1);
+
+      if (existingRun) {
+        console.log(`Skipping payout for creator ${summary.creator_id} in ${month}/${year}: payout_run already exists`);
+        return;
+      }
+
       // Create Stripe Transfer to creator's connected account
       const transfer = await this.stripe.transfers.create({
         amount: summary.net_cents,
@@ -288,12 +312,9 @@ export class PayoutEngine {
       });
 
       // Record payout run in database
-      const periodStart = new Date(year, month - 1, 1);
-      const periodEnd = new Date(year, month, 1);
-
       await this._db.insert(payoutRuns).values({
-        payoutPeriodStart: periodStart.toISOString().split('T')[0],
-        payoutPeriodEnd: periodEnd.toISOString().split('T')[0],
+        payoutPeriodStart: periodStartStr,
+        payoutPeriodEnd: periodEndStr,
         creatorId: summary.creator_id,
         totalGrossCents: summary.gross_cents,
         platformFeeCents: summary.platform_fee_cents,
@@ -325,78 +346,22 @@ export class PayoutEngine {
       if (!payout.stripeTransferId) continue;
 
       try {
-        // Note: Stripe Transfer status is determined by the object state
-        // For now, mark as paid after 10 minutes (simplified logic)
-        const processedTime = payout.processedAt?.getTime() || 0;
-        const ageMinutes = (Date.now() - processedTime) / (1000 * 60);
+        // Fetch actual transfer status from Stripe instead of using a time heuristic.
+        const transfer = await this.stripe.transfers.retrieve(payout.stripeTransferId);
+        const stripeStatus = transfer.reversed ? "failed" : "paid";
 
-        if (ageMinutes > 10) {
-          // Assume transfer succeeded after some time
-          await this._db
-            .update(payoutRuns)
-            .set({
-              transferStatus: "paid",
-              paidAt: new Date(),
-              updatedAt: new Date(),
-            })
-            .where(eq(payoutRuns.id, payout.id));
-        }
+        await this._db
+          .update(payoutRuns)
+          .set({
+            transferStatus: stripeStatus,
+            ...(stripeStatus === "paid" && { paidAt: new Date() }),
+            ...(stripeStatus === "failed" && { failedReason: "Transfer reversed" }),
+            updatedAt: new Date(),
+          })
+          .where(eq(payoutRuns.id, payout.id));
       } catch (error) {
         console.error(`Failed to check transfer status for payout ${payout.id}:`, error);
       }
-    }
-  }
-
-  /**
-   * Handle Stripe transfer webhook events
-   * (charge.transferred, transfer.paid, transfer.failed)
-   */
-  async handleTransferWebhookEvent(event: Stripe.Event): Promise<void> {
-    try {
-      const { payoutRuns } = await import("@nichestream/db");
-      const { eq } = await import("drizzle-orm");
-
-      // Parse event type and get transfer details
-      let transferId: string | undefined;
-      let transferStatus: string | undefined;
-
-      const eventType = event.type as string;
-      // Stripe SDK types not exported; use any for webhook event data
-      const eventData = event.data.object as any;
-
-      if (eventType === "transfer.paid") {
-        transferId = eventData.id;
-        transferStatus = "paid";
-      } else if (eventType === "transfer.failed") {
-        transferId = eventData.id;
-        transferStatus = "failed";
-      } else if (eventType === "charge.transferred") {
-        if (eventData.transfer) {
-          transferId = typeof eventData.transfer === "string" ? eventData.transfer : eventData.transfer.id;
-          transferStatus = "pending";
-        }
-      }
-
-      if (!transferId) {
-        console.warn(`Unknown or missing transfer in webhook event ${eventType}`);
-        return;
-      }
-
-      // Update payout_runs table with transfer status
-      await this._db
-        .update(payoutRuns)
-        .set({
-          // Stripe transfer status enum not strictly typed; use any for type coercion
-          transferStatus: transferStatus as any,
-          updatedAt: new Date(),
-          ...(transferStatus === "paid" && { paidAt: new Date() }),
-        })
-        .where(eq(payoutRuns.stripeTransferId, transferId));
-
-      console.log(`Updated payout transfer ${transferId} to status: ${transferStatus}`);
-    } catch (error) {
-      console.error("Error handling transfer webhook:", error);
-      throw error;
     }
   }
 }

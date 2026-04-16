@@ -51,6 +51,19 @@ STRIPE_CONNECT_CLIENT_ID = ""
 # Platform fee percentage for creator payouts (deducted from revenue)
 # Already defined above; this is for reference in payout calculations
 
+# ─── Optional feature flags ───────────────────────────────────────────────────
+# Public URL of the web frontend (used for Stripe, BetterAuth, and CORS).
+# Set via `wrangler secret put APP_BASE_URL` or in .dev.vars for local development.
+APP_BASE_URL = ""
+# Ad click-through destination URL embedded in VAST ClickThrough element.
+# Leave blank to fall back to APP_BASE_URL.
+AD_CLICK_THROUGH_URL = ""
+# Ad video asset URL served via GET /api/ads/ad-tag redirect.
+# Leave blank to return an empty VAST response (no ads).
+AD_VIDEO_URL = ""
+# Set to "true" to enable transactional email notifications (trial alerts, etc.)
+ENABLE_EMAIL_NOTIFICATIONS = "false"
+
 # ─── Secrets (set via `wrangler secret put <NAME>`) ──────────────────────────
 # BETTER_AUTH_SECRET      — BetterAuth signing secret (required)
 # STRIPE_SECRET_KEY       — Stripe API secret key (required)

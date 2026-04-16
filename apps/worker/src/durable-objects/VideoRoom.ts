@@ -214,6 +214,20 @@ export class VideoRoom {
     this.sessions.delete(sessionKey);
 
     if (session) {
+      // If the departing user is the watch party host, clear the host role so
+      // the next citizen+ user who sends a sync event can claim it.
+      if (this.watchPartyState.hostUserId === userId) {
+        this.watchPartyState = {
+          ...this.watchPartyState,
+          hostUserId: null,
+        };
+        this.broadcast({
+          type: "watch_party_host_left",
+          payload: { formerHostUserId: userId },
+          timestamp: new Date().toISOString(),
+        });
+      }
+
       const connectedCount = this.state.getWebSockets().length;
       this.broadcast({
         type: "user_presence",

@@ -43,13 +43,9 @@ export function useWebSocket({
   const connect = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
 
-    const params = new URLSearchParams({
-      username,
-      ...(userId && { userId }),
-      ...(avatarUrl && { avatarUrl }),
-    });
-
-    const ws = new WebSocket(`${WS_BASE_URL}/api/ws/${videoId}?${params.toString()}`);
+    // Only pass the videoId to identify which room to join.
+    // Identity (userId, username, avatarUrl) is resolved server-side from the session cookie.
+    const ws = new WebSocket(`${WS_BASE_URL}/api/ws/${videoId}`);
     wsRef.current = ws;
 
     ws.onopen = () => {
