@@ -331,7 +331,7 @@ app.onError((err, c) => {
  * and who have opted into trial_alerts email notifications.
  */
 async function handleScheduled(env: Env): Promise<void> {
-  if (!env.ENABLE_EMAIL_NOTIFICATIONS) {
+  if (env.ENABLE_EMAIL_NOTIFICATIONS !== "true") {
     console.log("[CRON] Email notifications disabled — skipping trial expiry check");
     return;
   }
@@ -379,9 +379,32 @@ async function handleScheduled(env: Env): Promise<void> {
   }
 }
 
+async function handleMonthlyPayoutScheduled(env: Env): Promise<void> {
+  try {
+    const Stripe = (await import("stripe")).default;
+    const { PayoutEngine } = await import("./lib/payouts");
+    const db = createDb(env);
+    const stripe = new Stripe(env.STRIPE_SECRET_KEY);
+    const payoutEngine = new PayoutEngine(db, env, stripe);
+    const now = new Date();
+    await payoutEngine.processMonthlyPayouts(now.getMonth() + 1, now.getFullYear());
+    console.log("[CRON] Monthly payout processing complete");
+  } catch (err) {
+    console.error("[CRON] Monthly payout processing failed:", err);
+  }
+}
+
 export default {
   fetch: app.fetch,
-  async scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
-    ctx.waitUntil(handleScheduled(env));
+  async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+    const cronName = controller.cron;
+    // Daily at 10:00 UTC — trial expiry email notifications
+    if (cronName === "0 10 * * *") {
+      ctx.waitUntil(handleScheduled(env));
+    }
+    // 1st of month at 02:00 UTC — creator payout processing
+    if (cronName === "0 2 1 * *") {
+      ctx.waitUntil(handleMonthlyPayoutScheduled(env));
+    }
   },
 };

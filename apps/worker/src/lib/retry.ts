@@ -124,36 +124,33 @@ export function persistWithRetry(
   config: Partial<RetryConfig> = {},
 ): void {
   const finalConfig = { ...DEFAULT_RETRY_CONFIG, ...config };
-  let lastError: Error | null = null;
 
-  const attemptFn = async (attempt: number) => {
-    try {
-      await fn();
-    } catch (err) {
-      lastError = err instanceof Error ? err : new Error(String(err));
-
-      if (attempt < finalConfig.maxAttempts - 1) {
-        const delayMs = calculateDelay(attempt, finalConfig);
-        setTimeout(() => {
-          attemptFn(attempt + 1);
-        }, delayMs);
-      } else {
-        // All retries exhausted
-        console.error(
-          `[${operationName}] Persistence failed after ${finalConfig.maxAttempts} attempts:`,
-          lastError.message,
+  // Run retries sequentially without delay to avoid reliance on setTimeout,
+  // which may not fire after Durable Object hibernation/eviction.
+  const runWithRetries = async () => {
+    let lastError: Error | null = null;
+    for (let attempt = 0; attempt < finalConfig.maxAttempts; attempt++) {
+      try {
+        await fn();
+        return; // Success
+      } catch (err) {
+        lastError = err instanceof Error ? err : new Error(String(err));
+        console.warn(
+          `[${operationName}] Attempt ${attempt + 1}/${finalConfig.maxAttempts} failed: ${lastError.message}`,
         );
-        // Log to monitoring/alerting system for manual recovery
-        // In production this would trigger PagerDuty or similar alert
-        console.error(`[${operationName}] CRITICAL: Operation failed permanently. Manual intervention required.`, {
-          operationName,
-          attempts: finalConfig.maxAttempts,
-          errorMessage: lastError.message,
-          timestamp: new Date().toISOString(),
-        });
       }
     }
+    // All retries exhausted
+    console.error(
+      `[${operationName}] Persistence failed after ${finalConfig.maxAttempts} attempts: ${lastError?.message}`,
+    );
+    console.error(`[${operationName}] CRITICAL: Operation failed permanently. Manual intervention required.`, {
+      operationName,
+      attempts: finalConfig.maxAttempts,
+      errorMessage: lastError?.message,
+      timestamp: new Date().toISOString(),
+    });
   };
 
-  attemptFn(0);
+  runWithRetries();
 }

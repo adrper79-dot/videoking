@@ -49,7 +49,7 @@ router.post("/create", async (c) => {
       return c.json({ error: "User not found" }, 404);
     }
 
-    const referralCode = `${user.username}_${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+    const referralCode = `${user.username}_${crypto.randomUUID().replace(/-/g, "").slice(0, 8).toUpperCase()}`;
 
     // Insert into referrals table
     await db.insert(referrals).values({

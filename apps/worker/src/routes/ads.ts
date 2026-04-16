@@ -4,6 +4,7 @@ import type { Env } from "../types";
 import { createDb } from "../lib/db";
 import { createLogger } from "../lib/logger";
 import { persistWithRetry } from "../lib/retry";
+import { requireSession } from "../middleware/session";
 import { adEvents, videos, earnings } from "@nichestream/db";
 
 const router = new Hono<{ Bindings: Env }>();
@@ -48,6 +49,7 @@ router.get("/vast", async (c) => {
       adTagUrl: `${c.env.APP_BASE_URL}/api/ads/ad-tag?videoId=${videoId}`,
       videoDurationSeconds: video.durationSeconds ?? 600,
       workerBaseUrl: c.env.APP_BASE_URL,
+      clickThroughUrl: c.env.AD_CLICK_THROUGH_URL ?? c.env.APP_BASE_URL,
     });
 
     c.header("Content-Type", "application/xml");
@@ -62,108 +64,137 @@ router.get("/vast", async (c) => {
 });
 
 /**
- * POST /api/ads/track
- * 
- * Track ad events (impressions, quartiles, completions, clicks).
- * Used by frontend IMA SDK integration for earnings attribution.
- * 
- * Payload:
- * {
- *   videoId: string,
- *   eventType: "impression" | "start" | "firstQuartile" | "midpoint" | "thirdQuartile" | "complete" | "click",
- *   timestamp?: string
- * }
+ * Shared ad event tracking logic (used by both GET and POST handlers).
+ * VAST 4.0 tracking pixels fire GET requests; IMA SDK integration uses POST.
  */
-router.post("/track", async (c) => {
+async function handleAdTrack(
+  videoId: string,
+  eventType: string,
+  timestamp: string | undefined,
+  c: Parameters<typeof createLogger>[0],
+): Promise<Response> {
   const logger = createLogger(c, { operation: "ads_track" });
 
+  const validEventTypes = new Set([
+    "impression",
+    "start",
+    "firstQuartile",
+    "midpoint",
+    "thirdQuartile",
+    "complete",
+    "click",
+  ]);
+
+  if (!videoId || !eventType || !validEventTypes.has(eventType)) {
+    logger.warn("track_missing_fields", { videoId, eventType });
+    return Response.json({ error: "videoId and valid eventType required" }, { status: 400 });
+  }
+
+  const db = createDb(c.env);
+
+  const [video] = await db
+    .select({ creatorId: videos.creatorId })
+    .from(videos)
+    .where(eq(videos.id, videoId))
+    .limit(1);
+
+  if (!video) {
+    logger.warn("track_video_not_found", { videoId });
+    return Response.json({ error: "Video not found" }, { status: 404 });
+  }
+
+  const estimatedCpm = 500; // $5 per 1000 impressions
+  const estimatedRevenueCents = Math.round(estimatedCpm / 1000);
+  const billableEvents = new Set(["impression", "firstQuartile", "complete"]);
+  const isBillable = billableEvents.has(eventType);
+
+  persistWithRetry(
+    async () => {
+      const isImpression = eventType === "impression" ? 1 : 0;
+      const isClick = eventType === "click" ? 1 : 0;
+      const revenueCents = isBillable ? String(estimatedRevenueCents) : "0";
+
+      await db.insert(adEvents).values({
+        videoId,
+        creatorId: video.creatorId,
+        eventType: eventType as "impression" | "start" | "firstQuartile" | "midpoint" | "thirdQuartile" | "complete" | "click",
+        impressions: isImpression,
+        clicks: isClick,
+        revenue: revenueCents,
+        createdAt: timestamp ? new Date(timestamp) : new Date(),
+      });
+
+      if (eventType === "impression" && isBillable) {
+        await db.insert(earnings).values({
+          creatorId: video.creatorId,
+          videoId,
+          type: "ad_impression",
+          grossAmountCents: estimatedRevenueCents,
+          platformFeeCents: Math.round(estimatedRevenueCents * 0.3),
+          netAmountCents: Math.round(estimatedRevenueCents * 0.7),
+          status: "pending",
+        });
+      }
+    },
+    `ad_event_${videoId}_${eventType}`,
+  );
+
+  logger.info("ad_event_tracked", { videoId, eventType, billable: isBillable });
+  return Response.json({ recorded: true });
+}
+
+/**
+ * POST /api/ads/track
+ *
+ * Track ad events from IMA SDK integration (JSON body).
+ * Requires authentication to prevent earnings fraud.
+ */
+router.post("/track", requireSession(), async (c) => {
   try {
     const body = await c.req.json<{
       videoId: string;
-      eventType:
-        | "impression"
-        | "start"
-        | "firstQuartile"
-        | "midpoint"
-        | "thirdQuartile"
-        | "complete"
-        | "click";
+      eventType: string;
       timestamp?: string;
     }>();
-
-    if (!body.videoId || !body.eventType) {
-      logger.warn("track_missing_fields", { videoId: body.videoId });
-      return c.json({ error: "videoId and eventType required" }, 400);
-    }
-
-    const db = createDb(c.env);
-
-    // Fetch video creator
-    const [video] = await db
-      .select({ creatorId: videos.creatorId })
-      .from(videos)
-      .where(eq(videos.id, body.videoId))
-      .limit(1);
-
-    if (!video) {
-      logger.warn("track_video_not_found", { videoId: body.videoId });
-      return c.json({ error: "Video not found" }, 404);
-    }
-
-    // Estimate revenue based on event type
-    // Industry standard: $2-8 CPM (cost per mille = per 1000 impressions)
-    // Using $5 CPM average = $0.005 per impression = 0.5 cents
-    const estimatedCpm = 500; // 500 cents = $5 per 1000 impressions
-    const estimatedRevenueCents = Math.round(estimatedCpm / 1000);
-
-    // Track only billable events
-    const billableEvents = new Set(["impression", "firstQuartile", "complete"]);
-    const isBillable = billableEvents.has(body.eventType);
-
-    // Persist ad event with retry logic
-    persistWithRetry(
-      async () => {
-        const isImpression = body.eventType === "impression" ? 1 : 0;
-        const isClick = body.eventType === "click" ? 1 : 0;
-        const revenueCents = isBillable ? String(estimatedRevenueCents) : "0";
-
-        await db.insert(adEvents).values({
-          videoId: body.videoId,
-          creatorId: video.creatorId,
-          eventType: body.eventType,
-          impressions: isImpression,
-          clicks: isClick,
-          revenue: revenueCents,
-          createdAt: body.timestamp ? new Date(body.timestamp) : new Date(),
-        });
-
-        // If impression and billable, also create earnings entry
-        if (body.eventType === "impression" && isBillable) {
-          await db.insert(earnings).values({
-            creatorId: video.creatorId,
-            videoId: body.videoId,
-            type: "ad_impression",
-            grossAmountCents: estimatedRevenueCents,
-            platformFeeCents: Math.round(estimatedRevenueCents * 0.3), // 30% platform fee
-            netAmountCents: Math.round(estimatedRevenueCents * 0.7), // 70% to creator
-            status: "pending",
-          });
-        }
-      },
-      `ad_event_${body.videoId}_${body.eventType}`,
-    );
-
-    logger.info("ad_event_tracked", {
-      videoId: body.videoId,
-      eventType: body.eventType,
-      billable: isBillable,
-    });
-
-    return c.json({ recorded: true });
+    return handleAdTrack(body.videoId, body.eventType, body.timestamp, c);
   } catch (err) {
+    const logger = createLogger(c, { operation: "ads_track" });
     logger.error("track_error", { error: String(err) });
     return c.json({ error: "Failed to track ad event" }, 500);
   }
+});
+
+/**
+ * GET /api/ads/track
+ *
+ * Track ad events fired by VAST 4.0 tracking pixels (GET requests from IMA SDK/browser).
+ * Requires authentication to prevent earnings fraud.
+ */
+router.get("/track", requireSession(), async (c) => {
+  try {
+    const videoId = c.req.query("videoId") ?? "";
+    const eventType = c.req.query("type") ?? "";
+    const timestamp = c.req.query("timestamp");
+    return handleAdTrack(videoId, eventType, timestamp, c);
+  } catch (err) {
+    const logger = createLogger(c, { operation: "ads_track" });
+    logger.error("track_error", { error: String(err) });
+    return c.json({ error: "Failed to track ad event" }, 500);
+  }
+});
+
+/**
+ * GET /api/ads/ad-tag
+ *
+ * Returns a redirect to the configured ad video asset.
+ * Configured via AD_VIDEO_URL environment variable.
+ */
+router.get("/ad-tag", async (c) => {
+  const adVideoUrl = c.env.AD_VIDEO_URL;
+  if (!adVideoUrl) {
+    return c.text(generateEmptyVast(), 200, { "Content-Type": "application/xml" });
+  }
+  return c.redirect(adVideoUrl, 302);
 });
 
 /**
@@ -176,6 +207,7 @@ function generateVastXml(options: {
   adTagUrl: string;
   videoDurationSeconds: number;
   workerBaseUrl: string;
+  clickThroughUrl: string;
 }): string {
   const trackingBaseUrl = `${options.workerBaseUrl}/api/ads/track`;
 
@@ -214,7 +246,7 @@ function generateVastXml(options: {
             </TrackingEvents>
             <VideoClicks>
               <ClickThrough>
-                <![CDATA[https://itsjusus.com]]>
+                <![CDATA[${options.clickThroughUrl}]]>
               </ClickThrough>
             </VideoClicks>
             <MediaFiles>
@@ -255,10 +287,17 @@ function generateEmptyVast(): string {
  *   byVideo: Array<{ videoId, impressions, revenueCents }>
  * }
  */
-router.get("/metrics/:creatorId", async (c) => {
+router.get("/metrics/:creatorId", requireSession(), async (c) => {
   const logger = createLogger(c, { operation: "ads_metrics" });
   const { creatorId } = c.req.param();
   const period = c.req.query("period") || "month";
+
+  // Only the creator themselves (or an admin) can view their metrics
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const requestingUser = (c as any).get("user") as { id: string; role?: string } | undefined;
+  if (!requestingUser || (requestingUser.id !== creatorId && requestingUser.role !== "admin")) {
+    return c.json({ error: "Forbidden", message: "Access denied" }, 403);
+  }
 
   try {
     const db = createDb(c.env);

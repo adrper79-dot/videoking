@@ -48,6 +48,10 @@ export interface Env {
   EMAIL_API_KEY?: string;
   /** Email preferences enabled */
   ENABLE_EMAIL_NOTIFICATIONS?: string;
+  /** Ad click-through destination URL (shown in VAST ClickThrough element) */
+  AD_CLICK_THROUGH_URL?: string;
+  /** Ad video asset URL served via /api/ads/ad-tag redirect */
+  AD_VIDEO_URL?: string;
 }
 
 /**

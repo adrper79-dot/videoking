@@ -38,6 +38,7 @@ export function SubscribeButton({ creatorId, creatorUsername }: SubscribeButtonP
         creatorId,
         plan: selectedPlan,
         priceId,
+        tier: "citizen",
       });
 
       if (data.checkoutUrl) {

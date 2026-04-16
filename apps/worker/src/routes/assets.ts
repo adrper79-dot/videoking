@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 import type { Env } from "../types";
 import { createDb } from "../lib/db";
 import { createAuth } from "../lib/auth";
@@ -35,20 +35,18 @@ assetsRouter.get("/", async (c) => {
 
     const sortOrder = sort === "popular" ? desc(assets.downloadCount) : desc(assets.createdAt);
 
-    // For now, just execute the base query
-    const allResults = await db.select().from(assets).orderBy(sortOrder).limit(limit).offset(offset);
-    
-    // Filter client-side (temporary until Drizzle query builder is fixed)
-    const filtered = allResults.filter(asset => {
-      if (category && asset.category !== category) return false;
-      if (creatorId && asset.creatorId !== creatorId) return false;
-      return true;
-    });
+    const results = await db
+      .select()
+      .from(assets)
+      .where(whereConditions.length > 0 ? and(...whereConditions) : undefined)
+      .orderBy(sortOrder)
+      .limit(limit)
+      .offset(offset);
 
     return c.json({
       success: true,
-      assets: filtered,
-      pagination: { limit, offset, count: filtered.length },
+      assets: results,
+      pagination: { limit, offset, count: results.length },
     });
   } catch (err) {
     console.error("GET /assets error:", err);

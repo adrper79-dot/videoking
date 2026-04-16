@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { eq, and, like, gte, lte, desc } from "drizzle-orm";
+import { eq, and, ilike, gte, lte, desc } from "drizzle-orm";
 import type { Env } from "../types";
 import { createDb } from "../lib/db";
 import { requireAdmin } from "../middleware/admin";
@@ -25,17 +25,25 @@ eventsRouter.get("/", async (c) => {
   try {
     const whereConditions = [];
 
-    // Search by name or slug
+    // Search by name or slug (case-insensitive)
     if (search) {
-      whereConditions.push(like(events.name, `%${search}%`));
+      whereConditions.push(ilike(events.name, `%${search}%`));
     }
 
-    // Date range filters
+    // Date range filters — validate ISO 8601 strings before use
     if (startAfter) {
-      whereConditions.push(gte(events.startDate, new Date(startAfter)));
+      const startDate = new Date(startAfter);
+      if (isNaN(startDate.getTime())) {
+        return c.json({ error: "BadRequest", message: "Invalid startAfter date" }, 400);
+      }
+      whereConditions.push(gte(events.startDate, startDate));
     }
     if (endBefore) {
-      whereConditions.push(lte(events.startDate, new Date(endBefore)));
+      const endDate = new Date(endBefore);
+      if (isNaN(endDate.getTime())) {
+        return c.json({ error: "BadRequest", message: "Invalid endBefore date" }, 400);
+      }
+      whereConditions.push(lte(events.startDate, endDate));
     }
 
     const results = await db
@@ -126,6 +134,12 @@ eventsRouter.post("/", requireAdmin(), async (c) => {
     );
   }
 
+  const parsedStart = new Date(body.startDate);
+  const parsedEnd = new Date(body.endDate);
+  if (isNaN(parsedStart.getTime()) || isNaN(parsedEnd.getTime())) {
+    return c.json({ error: "BadRequest", message: "Invalid date format" }, 400);
+  }
+
   try {
     const [created] = await db
       .insert(events)
@@ -133,8 +147,8 @@ eventsRouter.post("/", requireAdmin(), async (c) => {
         name: body.name,
         slug: body.slug,
         description: body.description || null,
-        startDate: new Date(body.startDate),
-        endDate: new Date(body.endDate),
+        startDate: parsedStart,
+        endDate: parsedEnd,
       })
       .returning();
 

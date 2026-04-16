@@ -55,7 +55,7 @@ export default async function WatchPage({ params }: WatchPageProps) {
           <ClientVideoWatcher video={video} />
 
           <div className="rounded-xl border border-neutral-800 bg-neutral-900 p-5">
-            <h1 className="text xl font-bold text-white">{video.title}</h1>
+            <h1 className="text-xl font-bold text-white">{video.title}</h1>
             <div className="mt-2 flex items-center gap-4 text-sm text-neutral-400">
               <span>{video.viewsCount.toLocaleString()} views</span>
               <span>{video.likesCount.toLocaleString()} likes</span>

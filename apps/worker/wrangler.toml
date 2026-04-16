@@ -65,6 +65,7 @@ pattern = "api.itsjusus.com/*"
 zone_name = "itsjusus.com"
 
 # ─── Scheduled Cron Triggers ──────────────────────────────────────────────────
-# Fires the `scheduled` handler daily at 10:00 UTC to send trial expiry emails
+# Daily at 10:00 UTC: trial expiry email notifications
+# 1st of every month at 02:00 UTC: creator payout processing
 [[triggers]]
-crons = ["0 10 * * *"]
+crons = ["0 10 * * *", "0 2 1 * *"]

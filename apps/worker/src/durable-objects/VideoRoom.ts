@@ -123,8 +123,11 @@ export class VideoRoom {
 
     const [client, server] = Object.values(new WebSocketPair()) as [WebSocket, WebSocket];
 
-    // Tag the WebSocket so we can identify the session on wake-up
-    this.state.acceptWebSocket(server, [userId, userTier, username, avatarUrl ?? "", videoId]);
+    // Each connection gets a unique ID to support multiple tabs per user.
+    // Tags: [userId, userTier, username, avatarUrl, videoId, connectionId]
+    const connectionId = crypto.randomUUID();
+    const sessionKey = `${userId}:${connectionId}`;
+    this.state.acceptWebSocket(server, [userId, userTier, username, avatarUrl ?? "", videoId, connectionId]);
 
     const session: Session = {
       userId,
@@ -134,7 +137,7 @@ export class VideoRoom {
       ws: server,
       lastMessageAt: 0,
     };
-    this.sessions.set(userId, session);
+    this.sessions.set(sessionKey, session);
 
     // Send current room state immediately after connect
     this.sendRoomState(server);
@@ -149,7 +152,7 @@ export class VideoRoom {
           username,
           avatarUrl,
           userTier,
-          connectedCount: this.sessions.size,
+          connectedCount: this.state.getWebSockets().length,
         },
         timestamp: new Date().toISOString(),
       },
@@ -165,10 +168,13 @@ export class VideoRoom {
 
     const tags = this.state.getTags(ws);
     const userId = tags[0] ?? "anonymous";
+    // Tags: [userId, userTier, username, avatarUrl, videoId, connectionId]
+    const connectionId = tags[5] ?? "unknown";
+    const sessionKey = `${userId}:${connectionId}`;
 
     // Re-register session if it was evicted from the in-memory Map during hibernation
-    if (!this.sessions.has(userId)) {
-      this.sessions.set(userId, {
+    if (!this.sessions.has(sessionKey)) {
+      this.sessions.set(sessionKey, {
         userId,
         username: tags[2] ?? "Guest",
         avatarUrl: tags[3] || null,
@@ -200,9 +206,11 @@ export class VideoRoom {
     const tags = this.state.getTags(ws);
     const userId = tags[0];
     if (!userId) return;
+    const connectionId = tags[5] ?? "unknown";
+    const sessionKey = `${userId}:${connectionId}`;
 
-    const session = this.sessions.get(userId);
-    this.sessions.delete(userId);
+    const session = this.sessions.get(sessionKey);
+    this.sessions.delete(sessionKey);
 
     if (session) {
       this.broadcast({
@@ -212,7 +220,7 @@ export class VideoRoom {
           userId,
           username: session.username,
           userTier: session.userTier,
-          connectedCount: this.sessions.size,
+          connectedCount: this.state.getWebSockets().length,
         },
         timestamp: new Date().toISOString(),
       });
@@ -221,7 +229,8 @@ export class VideoRoom {
 
   /** Dispatch incoming WebSocket messages to the appropriate handler. */
   private async handleMessage(userId: string, msg: WSMessage): Promise<void> {
-    const session = this.sessions.get(userId);
+    // Find any session for this userId (first match across multiple tabs)
+    const session = [...this.sessions.values()].find((s) => s.userId === userId);
     if (!session) return;
 
     switch (msg.type as WSMessageType) {
@@ -534,7 +543,7 @@ export class VideoRoom {
     const stateMsg: WSMessage = {
       type: "room_state",
       payload: {
-        connectedCount: this.sessions.size,
+        connectedCount: this.state.getWebSockets().length,
         recentMessages: this.chatHistory.slice(-50),
         activePoll: this.activePoll,
         reactionCounts: Object.fromEntries(this.reactionCounts),
@@ -573,13 +582,16 @@ export class VideoRoom {
   /** Broadcast a message to all connected sessions, optionally excluding one. */
   private broadcast(msg: WSMessage, excludeUserId?: string): void {
     const payload = JSON.stringify(msg);
-    for (const [userId, session] of this.sessions) {
-      if (userId === excludeUserId) continue;
+    // Use state.getWebSockets() to reach all sockets including hibernated ones.
+    // This is safe across DO hibernation — state.getWebSockets() always returns the full set.
+    for (const ws of this.state.getWebSockets()) {
+      const tags = this.state.getTags(ws);
+      const wsUserId = tags[0];
+      if (wsUserId === excludeUserId) continue;
       try {
-        session.ws.send(payload);
+        ws.send(payload);
       } catch {
-        // Remove dead connections
-        this.sessions.delete(userId);
+        // Socket is already closed — ignore
       }
     }
   }

@@ -100,7 +100,7 @@ webhooksRouter.post("/stripe", async (c) => {
             .where(eq(users.id, existing.subscriberId))
             .limit(1);
 
-          if (c.env.ENABLE_EMAIL_NOTIFICATIONS && user?.email) {
+          if (c.env.ENABLE_EMAIL_NOTIFICATIONS === "true" && user?.email) {
             try {
               const emailService = await createEmailService(c.env);
               await emailService.sendTrialEnded(user.email, user.displayName || "there");
@@ -161,7 +161,7 @@ webhooksRouter.post("/stripe", async (c) => {
           });
 
           // Send email if enabled and user has email
-          if (c.env.ENABLE_EMAIL_NOTIFICATIONS && user?.email) {
+          if (c.env.ENABLE_EMAIL_NOTIFICATIONS === "true" && user?.email) {
             try {
               const emailService = await createEmailService(c.env);
               await emailService.sendTrialEnding(user.email, 3, user.displayName || "there");

@@ -1,5 +1,6 @@
 import { index, pgEnum, pgTable, text, timestamp, uuid, integer, boolean, jsonb } from "drizzle-orm/pg-core";
 import { users } from "./users";
+import { events } from "./events";
 
 export const videoStatusEnum = pgEnum("video_status", [
   "processing",
@@ -72,7 +73,7 @@ export const videos = pgTable("videos", {
   style: videoStyleEnum("style"),
   tool: videoToolEnum("tool"),
   genre: videoGenreEnum("genre"),
-  eventId: uuid("event_id"),
+  eventId: uuid("event_id").references(() => events.id, { onDelete: "set null" }),
   humanCreatedAffirmed: boolean("human_created_affirmed").notNull().default(false),
   watermarkEnabled: boolean("watermark_enabled").notNull().default(false),
 }, (table) => ({
