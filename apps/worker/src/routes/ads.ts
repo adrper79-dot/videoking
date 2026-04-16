@@ -22,6 +22,82 @@ type AdEventType = (typeof AD_EVENT_TYPES)[number];
 
 const VALID_AD_EVENT_TYPES = new Set<string>(AD_EVENT_TYPES);
 
+/**
+ * Generate empty VAST response (no ads).
+ * Used when the user is not eligible for ads or ads fail to load.
+ */
+function generateEmptyVast(): string {
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<VAST version="4.0">
+  <Ad/>
+</VAST>`;
+}
+
+/**
+ * Generate VAST 4.0 XML for ad serving.
+ * Contains inline video ads with tracking pixels.
+ */
+function generateVastXml(options: {
+  videoId: string;
+  creatorId: string;
+  adTagUrl: string;
+  videoDurationSeconds: number;
+  workerBaseUrl: string;
+  clickThroughUrl: string;
+}): string {
+  const trackingBaseUrl = `${options.workerBaseUrl}/api/ads/track`;
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<VAST version="4.0">
+  <Ad id="1">
+    <InLine>
+      <AdSystem>NicheStream Ads</AdSystem>
+      <AdTitle>NicheStream Creator Support Ad</AdTitle>
+      <Impression id="1">
+        <![CDATA[${trackingBaseUrl}?videoId=${options.videoId}&type=impression]]>
+      </Impression>
+      <Creatives>
+        <Creative id="1">
+          <Linear skipOffset="PT5S">
+            <Duration>PT15S</Duration>
+            <TrackingEvents>
+              <Tracking event="start">
+                <![CDATA[${trackingBaseUrl}?videoId=${options.videoId}&type=start]]>
+              </Tracking>
+              <Tracking event="firstQuartile">
+                <![CDATA[${trackingBaseUrl}?videoId=${options.videoId}&type=firstQuartile]]>
+              </Tracking>
+              <Tracking event="midpoint">
+                <![CDATA[${trackingBaseUrl}?videoId=${options.videoId}&type=midpoint]]>
+              </Tracking>
+              <Tracking event="thirdQuartile">
+                <![CDATA[${trackingBaseUrl}?videoId=${options.videoId}&type=thirdQuartile]]>
+              </Tracking>
+              <Tracking event="complete">
+                <![CDATA[${trackingBaseUrl}?videoId=${options.videoId}&type=complete]]>
+              </Tracking>
+              <Tracking event="click">
+                <![CDATA[${trackingBaseUrl}?videoId=${options.videoId}&type=click]]>
+              </Tracking>
+            </TrackingEvents>
+            <VideoClicks>
+              <ClickThrough>
+                <![CDATA[${options.clickThroughUrl}]]>
+              </ClickThrough>
+            </VideoClicks>
+            <MediaFiles>
+              <MediaFile id="1" delivery="progressive" type="video/mp4" width="640" height="360">
+                <![CDATA[${options.adTagUrl}]]>
+              </MediaFile>
+            </MediaFiles>
+          </Linear>
+        </Creative>
+      </Creatives>
+    </InLine>
+  </Ad>
+</VAST>`;
+}
+
 const router = new Hono<{ Bindings: Env }>();
 
 /**
@@ -198,87 +274,10 @@ router.get("/track", requireSession(), async (c) => {
 router.get("/ad-tag", async (c) => {
   const adVideoUrl = c.env.AD_VIDEO_URL;
   if (!adVideoUrl) {
-    // generateEmptyVast is a hoisted function declaration — available throughout the module.
     return c.text(generateEmptyVast(), 200, { "Content-Type": "application/xml" });
   }
   return c.redirect(adVideoUrl, 302);
 });
-
-/**
- * Generate VAST 4.0 XML for ad serving
- * Contains inline video ads with tracking pixels
- */
-function generateVastXml(options: {
-  videoId: string;
-  creatorId: string;
-  adTagUrl: string;
-  videoDurationSeconds: number;
-  workerBaseUrl: string;
-  clickThroughUrl: string;
-}): string {
-  const trackingBaseUrl = `${options.workerBaseUrl}/api/ads/track`;
-
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<VAST version="4.0">
-  <Ad id="1">
-    <InLine>
-      <AdSystem>NicheStream Ads</AdSystem>
-      <AdTitle>NicheStream Creator Support Ad</AdTitle>
-      <Impression id="1">
-        <![CDATA[${trackingBaseUrl}?videoId=${options.videoId}&type=impression]]>
-      </Impression>
-      <Creatives>
-        <Creative id="1">
-          <Linear skipOffset="PT5S">
-            <Duration>PT15S</Duration>
-            <TrackingEvents>
-              <Tracking event="start">
-                <![CDATA[${trackingBaseUrl}?videoId=${options.videoId}&type=start]]>
-              </Tracking>
-              <Tracking event="firstQuartile">
-                <![CDATA[${trackingBaseUrl}?videoId=${options.videoId}&type=firstQuartile]]>
-              </Tracking>
-              <Tracking event="midpoint">
-                <![CDATA[${trackingBaseUrl}?videoId=${options.videoId}&type=midpoint]]>
-              </Tracking>
-              <Tracking event="thirdQuartile">
-                <![CDATA[${trackingBaseUrl}?videoId=${options.videoId}&type=thirdQuartile]]>
-              </Tracking>
-              <Tracking event="complete">
-                <![CDATA[${trackingBaseUrl}?videoId=${options.videoId}&type=complete]]>
-              </Tracking>
-              <Tracking event="click">
-                <![CDATA[${trackingBaseUrl}?videoId=${options.videoId}&type=click]]>
-              </Tracking>
-            </TrackingEvents>
-            <VideoClicks>
-              <ClickThrough>
-                <![CDATA[${options.clickThroughUrl}]]>
-              </ClickThrough>
-            </VideoClicks>
-            <MediaFiles>
-              <MediaFile id="1" delivery="progressive" type="video/mp4" width="640" height="360">
-                <![CDATA[${options.adTagUrl}]]>
-              </MediaFile>
-            </MediaFiles>
-          </Linear>
-        </Creative>
-      </Creatives>
-    </InLine>
-  </Ad>
-</VAST>`;
-}
-
-/**
- * Generate empty VAST response (no ads)
- * Used when user is not eligible for ads or ads fail to load
- */
-function generateEmptyVast(): string {
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<VAST version="4.0">
-  <Ad/>
-</VAST>`;
-}
 
 /**
  * GET /api/ads/metrics/:creatorId

@@ -198,7 +198,7 @@ export class VideoRoom {
       return;
     }
 
-    await this.handleMessage(userId, parsed);
+    await this.handleMessage(sessionKey, parsed);
   }
 
   /** Called by the Workers runtime when a WebSocket closes (hibernation). */
@@ -228,9 +228,8 @@ export class VideoRoom {
   }
 
   /** Dispatch incoming WebSocket messages to the appropriate handler. */
-  private async handleMessage(userId: string, msg: WSMessage): Promise<void> {
-    // Find any session for this userId (first match across multiple tabs)
-    const session = [...this.sessions.values()].find((s) => s.userId === userId);
+  private async handleMessage(sessionKey: string, msg: WSMessage): Promise<void> {
+    const session = this.sessions.get(sessionKey);
     if (!session) return;
 
     switch (msg.type as WSMessageType) {
