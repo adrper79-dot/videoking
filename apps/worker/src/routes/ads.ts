@@ -7,6 +7,21 @@ import { persistWithRetry } from "../lib/retry";
 import { requireSession } from "../middleware/session";
 import { adEvents, videos, earnings } from "@nichestream/db";
 
+/** All valid VAST 4.0 ad event types tracked by NicheStream. */
+const AD_EVENT_TYPES = [
+  "impression",
+  "start",
+  "firstQuartile",
+  "midpoint",
+  "thirdQuartile",
+  "complete",
+  "click",
+] as const;
+
+type AdEventType = (typeof AD_EVENT_TYPES)[number];
+
+const VALID_AD_EVENT_TYPES = new Set<string>(AD_EVENT_TYPES);
+
 const router = new Hono<{ Bindings: Env }>();
 
 /**
@@ -75,21 +90,12 @@ async function handleAdTrack(
 ): Promise<Response> {
   const logger = createLogger(c, { operation: "ads_track" });
 
-  const validEventTypes = new Set([
-    "impression",
-    "start",
-    "firstQuartile",
-    "midpoint",
-    "thirdQuartile",
-    "complete",
-    "click",
-  ]);
-
-  if (!videoId || !eventType || !validEventTypes.has(eventType)) {
+  if (!videoId || !eventType || !VALID_AD_EVENT_TYPES.has(eventType)) {
     logger.warn("track_missing_fields", { videoId, eventType });
     return Response.json({ error: "videoId and valid eventType required" }, { status: 400 });
   }
 
+  const validatedEventType = eventType as AdEventType;
   const db = createDb(c.env);
 
   const [video] = await db
@@ -105,26 +111,26 @@ async function handleAdTrack(
 
   const estimatedCpm = 500; // $5 per 1000 impressions
   const estimatedRevenueCents = Math.round(estimatedCpm / 1000);
-  const billableEvents = new Set(["impression", "firstQuartile", "complete"]);
-  const isBillable = billableEvents.has(eventType);
+  const billableEvents = new Set<AdEventType>(["impression", "firstQuartile", "complete"]);
+  const isBillable = billableEvents.has(validatedEventType);
 
   persistWithRetry(
     async () => {
-      const isImpression = eventType === "impression" ? 1 : 0;
-      const isClick = eventType === "click" ? 1 : 0;
+      const isImpression = validatedEventType === "impression" ? 1 : 0;
+      const isClick = validatedEventType === "click" ? 1 : 0;
       const revenueCents = isBillable ? String(estimatedRevenueCents) : "0";
 
       await db.insert(adEvents).values({
         videoId,
         creatorId: video.creatorId,
-        eventType: eventType as "impression" | "start" | "firstQuartile" | "midpoint" | "thirdQuartile" | "complete" | "click",
+        eventType: validatedEventType,
         impressions: isImpression,
         clicks: isClick,
         revenue: revenueCents,
         createdAt: timestamp ? new Date(timestamp) : new Date(),
       });
 
-      if (eventType === "impression" && isBillable) {
+      if (validatedEventType === "impression" && isBillable) {
         await db.insert(earnings).values({
           creatorId: video.creatorId,
           videoId,
@@ -292,9 +298,9 @@ router.get("/metrics/:creatorId", requireSession(), async (c) => {
   const { creatorId } = c.req.param();
   const period = c.req.query("period") || "month";
 
-  // Only the creator themselves (or an admin) can view their metrics
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const requestingUser = (c as any).get("user") as { id: string; role?: string } | undefined;
+  // Only the creator themselves (or an admin) can view their metrics.
+  // requireSession() has already set "user" on the context via c.set().
+  const requestingUser = c.get("user") as { id: string; role?: string } | undefined;
   if (!requestingUser || (requestingUser.id !== creatorId && requestingUser.role !== "admin")) {
     return c.json({ error: "Forbidden", message: "Access denied" }, 403);
   }

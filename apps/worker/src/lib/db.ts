@@ -10,6 +10,11 @@ import type { Env } from "../types";
  *
  * The cache is keyed by connection string so that workers with different Hyperdrive
  * bindings (e.g. staging vs. production) never share a client.
+ *
+ * Cache eviction: entries persist for the lifetime of the isolate. Cloudflare
+ * evicts isolates automatically when idle or when a new deployment is published.
+ * There is no manual eviction needed — each new deployment gets a fresh isolate
+ * and therefore a fresh connection pool.
  */
 const clientCache = new Map<string, ReturnType<typeof drizzle>>();
 
