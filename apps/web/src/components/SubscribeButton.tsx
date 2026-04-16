@@ -7,12 +7,14 @@ import type { SubscriptionCheckoutResponse } from "@nichestream/types";
 interface SubscribeButtonProps {
   creatorId: string;
   creatorUsername: string;
+  /** Subscription tier for this button. Defaults to "citizen". */
+  tier?: "citizen" | "vip";
 }
 
 /**
  * Subscribe button that creates a Stripe Checkout session for the creator's channel.
  */
-export function SubscribeButton({ creatorId, creatorUsername }: SubscribeButtonProps) {
+export function SubscribeButton({ creatorId, creatorUsername, tier = "citizen" }: SubscribeButtonProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [plan, setPlan] = useState<"monthly" | "annual">("monthly");
@@ -38,7 +40,7 @@ export function SubscribeButton({ creatorId, creatorUsername }: SubscribeButtonP
         creatorId,
         plan: selectedPlan,
         priceId,
-        tier: "citizen",
+        tier,
       });
 
       if (data.checkoutUrl) {

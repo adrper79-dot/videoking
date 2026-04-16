@@ -197,7 +197,7 @@ stripeRouter.post("/subscriptions", async (c) => {
       return c.json({ error: "NotFound", message: "Creator not found" }, 404);
     }
 
-    if (creator.role !== "creator" && creator.role !== "admin") {
+    if (creator.role !== "creator") {
       return c.json({ error: "BadRequest", message: "Target user is not a creator" }, 400);
     }
 

@@ -27,7 +27,9 @@ eventsRouter.get("/", async (c) => {
 
     // Search by name or slug (case-insensitive)
     if (search) {
-      whereConditions.push(ilike(events.name, `%${search}%`));
+      // Escape SQL LIKE special characters (%, _, \) to prevent unintended pattern matching
+      const escapedSearch = search.replace(/[%_\\]/g, "\\$&");
+      whereConditions.push(ilike(events.name, `%${escapedSearch}%`));
     }
 
     // Date range filters — validate ISO 8601 strings before use

@@ -126,33 +126,6 @@ webhooksRouter.post("/stripe", async (c) => {
         break;
       }
 
-      default: {
-        // Handle transfer status events that are not in Stripe's TypeScript union
-        // but are valid webhook events when enabled in the Stripe Dashboard.
-        const eventType = event.type as string;
-
-        if (eventType === "transfer.paid" || eventType === "transfer.failed") {
-          const transfer = (event as { data: { object: Stripe.Transfer } }).data.object;
-          const { payoutRuns } = await import("@nichestream/db");
-          if (eventType === "transfer.paid") {
-            await db
-              .update(payoutRuns)
-              .set({ transferStatus: "paid", paidAt: new Date(), updatedAt: new Date() })
-              .where(eq(payoutRuns.stripeTransferId, transfer.id));
-          } else {
-            await db
-              .update(payoutRuns)
-              .set({
-                transferStatus: "failed",
-                failedReason: "Transfer failed via Stripe webhook",
-                updatedAt: new Date(),
-              })
-              .where(eq(payoutRuns.stripeTransferId, transfer.id));
-          }
-        }
-        break;
-      }
-
       case "invoice.payment_succeeded": {
         // Fires on every successful subscription renewal (NOT on the initial invoice —
         // that's covered by customer.subscription.created). We skip billing_reason ===
@@ -211,6 +184,33 @@ webhooksRouter.post("/stripe", async (c) => {
               console.error("Failed to send trial ending email:", emailErr);
               // Don't fail webhook if email send fails
             }
+          }
+        }
+        break;
+      }
+
+      default: {
+        // Handle transfer status events that are not in Stripe's TypeScript union
+        // but are valid webhook events when enabled in the Stripe Dashboard.
+        const eventType = event.type as string;
+
+        if (eventType === "transfer.paid" || eventType === "transfer.failed") {
+          const transfer = (event as { data: { object: Stripe.Transfer } }).data.object;
+          const { payoutRuns } = await import("@nichestream/db");
+          if (eventType === "transfer.paid") {
+            await db
+              .update(payoutRuns)
+              .set({ transferStatus: "paid", paidAt: new Date(), updatedAt: new Date() })
+              .where(eq(payoutRuns.stripeTransferId, transfer.id));
+          } else {
+            await db
+              .update(payoutRuns)
+              .set({
+                transferStatus: "failed",
+                failedReason: "Transfer failed via Stripe webhook",
+                updatedAt: new Date(),
+              })
+              .where(eq(payoutRuns.stripeTransferId, transfer.id));
           }
         }
         break;

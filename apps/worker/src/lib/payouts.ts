@@ -275,8 +275,9 @@ export class PayoutEngine {
     try {
       // Idempotency: check if a payout_run already exists for this creator and period.
       // This prevents double-payment if the cron fires more than once in the same month.
+      // periodStart = first day of the payout month; periodEnd = last day of the payout month.
       const periodStart = new Date(year, month - 1, 1);
-      const periodEnd = new Date(year, month, 1);
+      const periodEnd = new Date(year, month, 0); // day-0 of next month == last day of current month
       const periodStartStr = periodStart.toISOString().split("T")[0];
       const periodEndStr = periodEnd.toISOString().split("T")[0];
 

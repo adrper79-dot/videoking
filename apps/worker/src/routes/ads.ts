@@ -155,14 +155,16 @@ router.get("/vast", async (c) => {
 });
 
 /**
- * Shared ad event tracking logic (used by both GET and POST handlers).
- * VAST 4.0 tracking pixels fire GET requests; IMA SDK integration uses POST.
+ * Shared ad event recording logic.
+ * @param recordEarnings - When false (GET/pixel path), inserts the adEvent row only.
+ *   Earnings insertion is reserved for authenticated POST calls to prevent pixel-based fraud.
  */
 async function handleAdTrack(
   videoId: string,
   eventType: string,
   timestamp: string | undefined,
   c: Context,
+  recordEarnings = false,
 ): Promise<Response> {
   const logger = createLogger(c, { operation: "ads_track" });
 
@@ -188,7 +190,7 @@ async function handleAdTrack(
   const estimatedCpm = 500; // $5 per 1000 impressions
   const estimatedRevenueCents = Math.round(estimatedCpm / 1000);
   const billableEvents = new Set<AdEventType>(["impression", "firstQuartile", "complete"]);
-  const isBillable = billableEvents.has(validatedEventType);
+  const isBillable = recordEarnings && billableEvents.has(validatedEventType);
 
   persistWithRetry(
     async () => {
@@ -206,7 +208,8 @@ async function handleAdTrack(
         createdAt: timestamp ? new Date(timestamp) : new Date(),
       });
 
-      if (validatedEventType === "impression" && isBillable) {
+      // Only insert earnings for authenticated POST tracking calls
+      if (isBillable && validatedEventType === "impression") {
         await db.insert(earnings).values({
           creatorId: video.creatorId,
           videoId,
@@ -238,7 +241,7 @@ router.post("/track", requireSession(), async (c) => {
       eventType: string;
       timestamp?: string;
     }>();
-    return handleAdTrack(body.videoId, body.eventType, body.timestamp, c);
+    return handleAdTrack(body.videoId, body.eventType, body.timestamp, c, true);
   } catch (err) {
     const logger = createLogger(c, { operation: "ads_track" });
     logger.error("track_error", { error: String(err) });
@@ -252,15 +255,16 @@ router.post("/track", requireSession(), async (c) => {
  * Track ad events fired by VAST 4.0 tracking pixels.
  * VAST <Impression> and <TrackingEvents> fire unauthenticated GET requests from the
  * browser/IMA SDK, so session auth cannot be required here.
- * Fraud mitigation: events are validated against existing video IDs and earnings are
- * credited at fractions of a cent per call, limiting blast radius.
+ * Fraud mitigation: only the adEvents row is recorded (no earnings) to prevent pixel-based
+ * revenue inflation. Earnings are only created via the authenticated POST handler.
  */
 router.get("/track", async (c) => {
   try {
     const videoId = c.req.query("videoId") ?? "";
     const eventType = c.req.query("type") ?? "";
     const timestamp = c.req.query("timestamp");
-    return handleAdTrack(videoId, eventType, timestamp, c);
+    // recordEarnings=false: GET tracking pixels record events only, no earnings
+    return handleAdTrack(videoId, eventType, timestamp, c, false);
   } catch (err) {
     const logger = createLogger(c, { operation: "ads_track" });
     logger.error("track_error", { error: String(err) });
